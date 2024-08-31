@@ -1,0 +1,32 @@
+--  Factorial program.
+USE std.textio.ALL; --  Imports the standard textio package.
+
+--  Defines a design entity, without any ports.
+ENTITY factorial
+{
+
+}
+
+ARCHITECTURE behaviour OF factorial
+    -- why is this here? In HLHDL allow to define functions without the need of being in an architecture
+    -- automatically put them in the architectures that use them
+    FUNCTION factorial_fn(n : NATURAL) RETURN NATURAL
+        -- replace all "is" and "begin" with "{" and end with "}"
+    {
+        -- replace "then" with "{" and "else" with "} else {" and "end if" with "}"
+        if n = 0 {
+            RETURN 1;
+        } else {
+            RETURN n * factorial_fn(n - 1);
+        }
+    }
+{
+    PROCESS
+        VARIABLE l : line;
+    {
+        write (l, STRING'("factorial of 5 is: "));
+        write (l, INTEGER'(factorial_fn(5)));
+        writeline (output, l);
+        WAIT;
+    }
+}

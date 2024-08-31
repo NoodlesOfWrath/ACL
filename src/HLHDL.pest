@@ -1,0 +1,21 @@
+// Pest grammar for HLHDL-like syntax
+
+program = _{ SOI ~ "\n"* ~ (statement ~ "\n"+)* ~ EOI }
+statement = _{expr}
+expression = {
+    assignment
+    | identifier
+    // like var1 + var2
+    | dyadic    
+}
+
+assignment = _{ "let" ~ identifier ~ "=" ~ expression }
+identifier = _{ ASCII_ALPHA ~ (ASCII_ALPHA | ASCII_DIGIT)* }
+dyadic = _{ expression ~ operator ~ expression }
+
+
+
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
+COMMENT = _{ "#" ~ (!"\n" ~ ANY)* }
+
+
