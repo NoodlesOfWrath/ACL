@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate pest_derive;
 
-use pest::Parser;
+use pest::{pratt_parser::PrattParser, Parser};
 mod ast;
 use ast::*;
 
