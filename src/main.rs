@@ -12,7 +12,7 @@ struct HLHDLParser;
 fn main() {
     let unparsed_file = std::fs::read_to_string("example.hlhdl").expect("cannot read file");
 
-    let parse_result = HLHDLParser::parse(Rule::WHITESPACE, &unparsed_file);
+    let parse_result = HLHDLParser::parse(Rule::program, &unparsed_file);
 
     match parse_result {
         Ok(parsed) => println!("{:#?}", parsed),

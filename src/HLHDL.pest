@@ -1,17 +1,19 @@
 // Pest grammar for HLHDL-like syntax
 
-program = _{ SOI ~ "\n"* ~ (statement ~ "\n"+)* ~ EOI }
-statement = _{expr}
+program = _{ SOI ~ ";"* ~ (statement ~ ";"+)* ~ EOI }
+statement = _{expression}
 expression = {
     assignment
     | identifier
+    | value
     // like var1 + var2
-    | dyadic    
 }
 
-assignment = _{ "let" ~ identifier ~ "=" ~ expression }
+assignment = _{ "let " ~ identifier ~ "=" ~ expression }
 identifier = _{ ASCII_ALPHA ~ (ASCII_ALPHA | ASCII_DIGIT)* }
+operator = _{ "+" | "-" | "*" | "/" | "%" }
 dyadic = _{ expression ~ operator ~ expression }
+value = _{ ASCII_DIGIT+ }
 
 
 
