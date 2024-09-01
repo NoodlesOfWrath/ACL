@@ -15,7 +15,19 @@ fn main() {
     let parse_result = HLHDLParser::parse(Rule::program, &unparsed_file);
 
     match parse_result {
-        Ok(parsed) => println!("{:#?}", parsed),
+        Ok(parsed) => {
+            let mut all_nodes = vec![];
+            for pair in parsed {
+                let ast = build_ast(pair);
+                if let Some(ast) = ast {
+                    all_nodes.push(ast);
+                } else {
+                    println!("Error parsing AST");
+                }
+            }
+            let node = ASTNode::Program(all_nodes);
+            println!("{:#?}", node);
+        }
         Err(e) => println!("Parsing error: {}", e),
     }
 }

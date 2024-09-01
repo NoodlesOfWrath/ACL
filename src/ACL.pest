@@ -1,17 +1,19 @@
 // Pest grammar for HLHDL-like syntax
 
 program = _{ SOI  ~ (outer_statement +)* ~ EOI }
-outer_statement = _{ function }
+outer_statement = _{ function_def}
 
-function = { "fn" ~ identifier ~ "(" ~ params? ~ ")" ~ "{" ~ (inner_statement +)* ~ "}" }
-inner_statement = { inner_statements_with_semicolon | if }
-inner_statements_with_semicolon = { (return | assignment | function_call) ~ ";" }
-params = { (identifier ~ ":" ~ type) ~ ("," ~ identifier ~ ":" ~ type)* }
+function_def= { "fn" ~ identifier ~ "(" ~ params? ~ ")" ~ function_body }
+function_body = { "{" ~ (inner_statement +)* ~ "}" }
+inner_statement = _{ inner_statements_with_semicolon | if }
+inner_statements_with_semicolon = _{ (return_statement | assignment | function_call) ~ ";" }
+params = { param ~ ("," ~ param)* }
+param = { identifier ~ ":" ~ type }
 
 function_call = { identifier ~ "(" ~ param_list? ~ ")" }
 param_list = { expression ~ ("," ~ expression)* }
 
-type = _{ "String" | "int"}
+type = { "String" | "Int"}
 
 assignment = _{ "let " ~ identifier ~ "=" ~ expression }
 // anything that can be coerced to a value
@@ -33,8 +35,8 @@ value = _{ ASCII_DIGIT+ | string }
 string = _{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 
 
-if = _{ "if" ~ expression ~ "{" ~ (inner_statement +)* ~ "}" ~ ("else" ~ "{" ~ (inner_statement +)* ~ "}")? }
-return = _{ "return" ~ expression }
+if = { "if" ~ expression ~ "{" ~ (inner_statement +)* ~ "}" ~ ("else" ~ "{" ~ (inner_statement +)* ~ "}")? }
+return_statement = { "return" ~ expression }
 
 WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
 COMMENT = _{ ("/*" ~ (!"*/" ~ ANY)* ~ "*/") | ("//" ~ (!"\n" ~ ANY)*) }
