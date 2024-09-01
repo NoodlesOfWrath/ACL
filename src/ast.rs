@@ -49,8 +49,51 @@ struct FunctionCall {
 pub enum ASTNode {
     Program(Vec<ASTNode>),
     FunctionDefinition(FunctionDefinition),
-    FunctionCall(FunctionCall),
     Return(Box<ASTNode>),
+    Expression(Expression),
+    IfStatement(IfStatement),
+}
+
+#[derive(Debug)]
+struct IfStatement {
+    condition: Box<Expression>,
+    body: Vec<ASTNode>,
+}
+
+#[derive(Debug)]
+pub enum Expression {
+    Dyadic(Dyadic),
+    Value(Value),
+    ParenExpression(Box<Expression>),
+    Identifier(String),
+    FunctionCall(FunctionCall),
+}
+
+#[derive(Debug)]
+pub struct Dyadic {
+    pub left: Box<Expression>,
+    pub operator: Operator,
+    pub right: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub enum Operator {
+    Plus,
+    Minus,
+    Multiply,
+    Divide,
+    Equal,
+    NotEqual,
+    LessThan,
+    LessThanOrEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+}
+
+#[derive(Debug)]
+pub enum Value {
+    Int(i32),
+    String(String),
 }
 
 pub fn build_ast(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
@@ -125,12 +168,105 @@ pub fn build_ast(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
                 .into_inner()
                 .map(|inner_pair| build_ast(inner_pair))
                 .collect::<Option<Vec<ASTNode>>>()?;
-            Some(ASTNode::FunctionCall(FunctionCall { name, args }))
+            Some(ASTNode::Expression(Expression::FunctionCall(
+                FunctionCall { name, args },
+            )))
         }
         Rule::return_statement => {
             let inner_pair = pair.into_inner().next()?;
             Some(ASTNode::Return(Box::new(build_ast(inner_pair)?)))
         }
-        _ => None,
+        Rule::expression => {
+            let inner_pair = pair.into_inner().next()?;
+            let inner_ast = build_ast(inner_pair);
+            inner_ast
+        }
+        Rule::primary_expression => {
+            let inner_pair = pair.into_inner().next()?;
+            let inner_ast = build_ast(inner_pair);
+            inner_ast
+        }
+        Rule::dyadic => {
+            let mut inner_pairs = pair.into_inner();
+
+            let left_ast =
+                build_ast(inner_pairs.next().expect("failed to get left dyadic")).unwrap();
+            let left: Expression = match left_ast {
+                ASTNode::Expression(p) => p,
+                _ => panic!("Expected expression"),
+            };
+
+            let op_str = inner_pairs
+                .next()
+                .expect("failed to get operator of dyadic")
+                .as_str();
+
+            let operator = match op_str {
+                "+" => Operator::Plus,
+                "-" => Operator::Minus,
+                "*" => Operator::Multiply,
+                "/" => Operator::Divide,
+                "==" => Operator::Equal,
+                "!=" => Operator::NotEqual,
+                "<" => Operator::LessThan,
+                "<=" => Operator::LessThanOrEqual,
+                ">" => Operator::GreaterThan,
+                ">=" => Operator::GreaterThanOrEqual,
+                _ => panic!("Unknown operator {:?}", op_str),
+            };
+
+            let right_ast =
+                build_ast(inner_pairs.next().expect("failed to get right of dyadic")).unwrap();
+            let right: Expression = match right_ast {
+                ASTNode::Expression(p) => p,
+                _ => panic!("Expected expression got {:?}", right_ast),
+            };
+
+            Some(ASTNode::Expression(Expression::Dyadic(Dyadic {
+                left: Box::new(left),
+                operator,
+                right: Box::new(right),
+            })))
+        }
+        Rule::primary_identifier => {
+            let name = pair.as_str().to_string();
+            Some(ASTNode::Expression(Expression::Identifier(name)))
+        }
+        Rule::value => {
+            let inner_pair = pair.into_inner().next().unwrap();
+            println!("inner_pair: {:?}", inner_pair);
+            let value = match inner_pair.as_rule() {
+                Rule::int => Value::Int(inner_pair.as_str().parse().unwrap()),
+                Rule::string => Value::String(inner_pair.as_str().to_string()),
+                _ => panic!("Unknown value type {:?}", inner_pair.as_rule()),
+            };
+            Some(ASTNode::Expression(Expression::Value(value)))
+        }
+        Rule::if_statement => {
+            let mut inner_pairs = pair.into_inner();
+            let condition = build_ast(inner_pairs.next().unwrap()).unwrap();
+            let mut body = vec![];
+            while let Some(inner_pair) = inner_pairs.next() {
+                let inner_clone = inner_pair.clone(); // clone for debug TODO: remove
+                let ast = build_ast(inner_pair);
+                if let Some(ast) = ast {
+                    body.push(ast);
+                } else {
+                    println!("Error parsing AST: {:?}", inner_clone);
+                }
+            }
+            Some(ASTNode::IfStatement(IfStatement {
+                condition: Box::new(match condition {
+                    ASTNode::Expression(p) => p,
+                    _ => panic!("Expected expression"),
+                }),
+                body,
+            }))
+        }
+        Rule::EOI => None,
+        _ => {
+            println!("Unknown rule: {:?}", pair.as_rule());
+            None
+        }
     }
 }

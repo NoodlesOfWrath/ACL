@@ -5,7 +5,7 @@ outer_statement = _{ function_def}
 
 function_def= { "fn" ~ identifier ~ "(" ~ params? ~ ")" ~ function_body }
 function_body = { "{" ~ (inner_statement +)* ~ "}" }
-inner_statement = _{ inner_statements_with_semicolon | if }
+inner_statement = _{ inner_statements_with_semicolon | if_statement}
 inner_statements_with_semicolon = _{ (return_statement | assignment | function_call) ~ ";" }
 params = { param ~ ("," ~ param)* }
 param = { identifier ~ ":" ~ type }
@@ -21,7 +21,7 @@ expression = {
     dyadic
     | primary_expression
 }
-dyadic = { primary_expression ~ (operator ~ primary_expression)* }
+dyadic = { primary_expression ~ (operator ~ primary_expression) }
 primary_expression = _{ function_call | paren_expression | identifier | value }
 paren_expression = _{ "(" ~ expression ~ ")" }
 
@@ -30,12 +30,13 @@ identifier = _{ !reserved ~ primary_identifier }
 primary_identifier = @{ !ASCII_DIGIT ~ (ASCII_ALPHA | ASCII_DIGIT | "_")* }
 reserved = _{ "fn" | "if" | "else" | "return" | "let" | "String" | "int" }
 
-operator = _{ "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | ">" | "<=" | ">=" }
-value = _{ ASCII_DIGIT+ | string }
-string = _{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+operator = { "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | ">" | "<=" | ">=" }
+value = { int | string }
+string = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+int = @{ ASCII_DIGIT+ }
 
 
-if = { "if" ~ expression ~ "{" ~ (inner_statement +)* ~ "}" ~ ("else" ~ "{" ~ (inner_statement +)* ~ "}")? }
+if_statement= { "if" ~ expression ~ "{" ~ (inner_statement +)* ~ "}" ~ ("else" ~ "{" ~ (inner_statement +)* ~ "}")? }
 return_statement = { "return" ~ expression }
 
 WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
