@@ -1,0 +1,42 @@
+// Pest grammar for HLHDL-like syntax
+
+program = _{ SOI  ~ (outer_statement +)* ~ EOI }
+outer_statement = _{ function }
+
+function = { "fn" ~ identifier ~ "(" ~ params? ~ ")" ~ "{" ~ (inner_statement +)* ~ "}" }
+inner_statement = { assignment | function_call | if | return }
+params = { (identifier ~ ":" ~ type) ~ ("," ~ identifier ~ ":" ~ type)* }
+
+function_call = { identifier ~ "(" ~ param_list? ~ ")" }
+param_list = { expression ~ ("," ~ expression)* }
+
+type = _{ "String" | "int"}
+
+assignment = _{ "let " ~ identifier ~ "=" ~ expression }
+// anything that can be coerced to a value
+expression = {
+    dyadic
+    | identifier
+    | value
+    | paren_expression
+    | function_call
+}
+paren_expression = _{ "(" ~ expression ~ ")" }
+
+// any word that starts with a letter and is followed by letters or numbers
+identifier = @{ !reserved ~ ASCII_ALPHA ~ (ASCII_ALPHA | ASCII_DIGIT | "_")* }
+reserved = _{ "fn" | "if" | "else" | "return" | "let" | "String" | "int" }
+
+operator = _{ "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | ">" | "<=" | ">=" }
+value = _{ ASCII_DIGIT+ | string }
+string = _{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+
+dyadic = { primary_expression ~ (operator ~ primary_expression)+ }
+primary_expression = _{ paren_expression | identifier | value | function_call }
+
+if = _{ "if" ~ expression ~ "{" ~ (inner_statement ~ ";"+)* ~ "}" ~ ("else" ~ "{" ~ (inner_statement ~ ";"+)* ~ "}")? }
+return = _{ "return" ~ expression }
+
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
+COMMENT = _{ ("/*" ~ (!"*/" ~ ANY)* ~ "*/") | ("//" ~ (!"\n" ~ ANY)*) }
+
