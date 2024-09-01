@@ -4,7 +4,8 @@ program = _{ SOI  ~ (outer_statement +)* ~ EOI }
 outer_statement = _{ function }
 
 function = { "fn" ~ identifier ~ "(" ~ params? ~ ")" ~ "{" ~ (inner_statement +)* ~ "}" }
-inner_statement = { assignment | function_call | if | return }
+inner_statement = { inner_statements_with_semicolon | if }
+inner_statements_with_semicolon = { (return | assignment | function_call) ~ ";" }
 params = { (identifier ~ ":" ~ type) ~ ("," ~ identifier ~ ":" ~ type)* }
 
 function_call = { identifier ~ "(" ~ param_list? ~ ")" }
@@ -19,11 +20,12 @@ expression = {
     | primary_expression
 }
 dyadic = { primary_expression ~ (operator ~ primary_expression)* }
-primary_expression = _{ paren_expression | identifier | value | function_call }
+primary_expression = _{ function_call | paren_expression | identifier | value }
 paren_expression = _{ "(" ~ expression ~ ")" }
 
 // any word that starts with a letter and is followed by letters or numbers
-identifier = @{ !ASCII_ALPHA ~ (ASCII_ALPHA | ASCII_DIGIT | "_")* }
+identifier = _{ !reserved ~ primary_identifier }
+primary_identifier = @{ !ASCII_DIGIT ~ (ASCII_ALPHA | ASCII_DIGIT | "_")* }
 reserved = _{ "fn" | "if" | "else" | "return" | "let" | "String" | "int" }
 
 operator = _{ "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | ">" | "<=" | ">=" }
@@ -31,7 +33,7 @@ value = _{ ASCII_DIGIT+ | string }
 string = _{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 
 
-if = _{ "if" ~ expression ~ "{" ~ (inner_statement ~ ";"+)* ~ "}" ~ ("else" ~ "{" ~ (inner_statement ~ ";"+)* ~ "}")? }
+if = _{ "if" ~ expression ~ "{" ~ (inner_statement +)* ~ "}" ~ ("else" ~ "{" ~ (inner_statement +)* ~ "}")? }
 return = _{ "return" ~ expression }
 
 WHITESPACE = _{ " " | "\t" | "\n" | "\r" }

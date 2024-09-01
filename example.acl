@@ -7,5 +7,5 @@ fn factorial(num: int) {
 }
 
 fn main() {
-    print("Hello, World!");
+    print(factorial(5));
 }
