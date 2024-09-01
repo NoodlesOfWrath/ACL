@@ -16,23 +16,20 @@ assignment = _{ "let " ~ identifier ~ "=" ~ expression }
 // anything that can be coerced to a value
 expression = {
     dyadic
-    | identifier
-    | value
-    | paren_expression
-    | function_call
+    | primary_expression
 }
+dyadic = { primary_expression ~ (operator ~ primary_expression)* }
+primary_expression = _{ paren_expression | identifier | value | function_call }
 paren_expression = _{ "(" ~ expression ~ ")" }
 
 // any word that starts with a letter and is followed by letters or numbers
-identifier = @{ !reserved ~ ASCII_ALPHA ~ (ASCII_ALPHA | ASCII_DIGIT | "_")* }
+identifier = @{ !ASCII_ALPHA ~ (ASCII_ALPHA | ASCII_DIGIT | "_")* }
 reserved = _{ "fn" | "if" | "else" | "return" | "let" | "String" | "int" }
 
 operator = _{ "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | ">" | "<=" | ">=" }
 value = _{ ASCII_DIGIT+ | string }
 string = _{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 
-dyadic = { primary_expression ~ (operator ~ primary_expression)+ }
-primary_expression = _{ paren_expression | identifier | value | function_call }
 
 if = _{ "if" ~ expression ~ "{" ~ (inner_statement ~ ";"+)* ~ "}" ~ ("else" ~ "{" ~ (inner_statement ~ ";"+)* ~ "}")? }
 return = _{ "return" ~ expression }
