@@ -10,16 +10,37 @@ enum Type {
     String,
 }
 
+impl Type {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "Int" => Type::Int,
+            "String" => Type::String,
+            _ => panic!("Unknown type: {}", s),
+        }
+    }
+}
+
 #[derive(Debug)]
 struct FunctionDefinition {
     name: String,
     args: Vec<(String, Type)>,
+    return_type: Option<Type>,
     body: Vec<ASTNode>,
 }
 
 impl FunctionDefinition {
-    fn new(name: String, args: Vec<(String, Type)>, body: Vec<ASTNode>) -> Self {
-        FunctionDefinition { name, args, body }
+    fn new(
+        name: String,
+        args: Vec<(String, Type)>,
+        body: Vec<ASTNode>,
+        return_type: Option<Type>,
+    ) -> Self {
+        FunctionDefinition {
+            name,
+            args,
+            body,
+            return_type,
+        }
     }
 
     fn check_compatibility(&self, other: &FunctionCall) -> bool {
@@ -110,6 +131,7 @@ pub fn build_ast(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
             let name = inner_pairs.next().unwrap().as_str().to_string();
             let mut args = vec![];
             let mut body = vec![];
+            let mut return_type = None;
             // keep consuming pairs until we reach the function body
             while let Some(inner_pair) = inner_pairs.next() {
                 match inner_pair.as_rule() {
@@ -124,14 +146,19 @@ pub fn build_ast(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
                             let mut inner_pairs = param.into_inner();
                             let name = inner_pairs.next().unwrap().as_str().to_string();
                             let type_str = inner_pairs.next().unwrap().as_str();
-                            let type_enum = match type_str {
-                                "Int" => Type::Int,
-                                "String" => Type::String,
-                                _ => {
-                                    panic!("Unknown type: {}", type_str);
-                                }
-                            };
+                            let type_enum = Type::from_str(type_str);
                             args.push((name, type_enum));
+                        }
+                    }
+                    Rule::return_type => {
+                        let inner = inner_pair.into_inner();
+                        for inner_pair in inner {
+                            match inner_pair.as_rule() {
+                                Rule::value_type => {
+                                    return_type = Some(Type::from_str(inner_pair.as_str()))
+                                }
+                                _ => {}
+                            };
                         }
                     }
                     Rule::function_body => {
@@ -152,7 +179,10 @@ pub fn build_ast(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
             }
 
             Some(ASTNode::FunctionDefinition(FunctionDefinition::new(
-                name, args, body,
+                name,
+                args,
+                body,
+                return_type,
             )))
         }
         Rule::function_call => {

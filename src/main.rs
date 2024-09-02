@@ -4,6 +4,7 @@ extern crate pest_derive;
 use pest::{pratt_parser::PrattParser, Parser};
 mod ast;
 use ast::*;
+mod translator;
 
 #[derive(Parser)]
 #[grammar = "ACL.pest"] // Specifies the grammar file

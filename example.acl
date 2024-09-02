@@ -1,4 +1,4 @@
-fn factorial(num: Int) {
+fn factorial(num: Int) -> Int {
     if num == 0 {
         return 1;
     }
@@ -6,6 +6,6 @@ fn factorial(num: Int) {
     return num * factorial(num - 1);
 }
 
-fn main() {
-    print(factorial(5));
+fn main() -> Int {
+    return factorial(5);
 }

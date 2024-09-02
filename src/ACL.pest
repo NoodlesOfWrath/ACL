@@ -3,17 +3,18 @@
 program = _{ SOI  ~ (outer_statement +)* ~ EOI }
 outer_statement = _{ function_def}
 
-function_def= { "fn" ~ identifier ~ "(" ~ params? ~ ")" ~ function_body }
+function_def= { "fn" ~ identifier ~ "(" ~ params? ~ ")" ~ return_type? ~ function_body }
+return_type= { "->" ~ value_type}
 function_body = { "{" ~ (inner_statement +)* ~ "}" }
 inner_statement = _{ inner_statements_with_semicolon | if_statement}
 inner_statements_with_semicolon = _{ (return_statement | assignment | function_call) ~ ";" }
 params = { param ~ ("," ~ param)* }
-param = { identifier ~ ":" ~ type }
+param = { identifier ~ ":" ~ value_type}
 
 function_call = { identifier ~ "(" ~ param_list? ~ ")" }
 param_list = { expression ~ ("," ~ expression)* }
 
-type = { "String" | "Int"}
+value_type= { "String" | "Int"}
 
 assignment = _{ "let " ~ identifier ~ "=" ~ expression }
 // anything that can be coerced to a value
