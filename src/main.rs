@@ -18,12 +18,11 @@ fn main() {
         Ok(parsed) => {
             let mut all_nodes = vec![];
             for pair in parsed {
-                let ast = build_ast(pair);
+                let ast = build_ast(pair.clone());
                 if let Some(ast) = ast {
                     all_nodes.push(ast);
-                } else {
-                    println!("Error parsing AST");
                 }
+                // none is returned for like EOI
             }
             let node = ASTNode::Program(all_nodes);
             println!("{:#?}", node);

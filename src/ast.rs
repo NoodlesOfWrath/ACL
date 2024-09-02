@@ -143,7 +143,7 @@ pub fn build_ast(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
                             if let Some(ast) = ast {
                                 body.push(ast);
                             } else {
-                                println!("Error parsing AST: {:?}", inner_clone);
+                                println!("Error parsing AST for function body: {:?}", inner_clone);
                             }
                         }
                     }
@@ -151,10 +151,6 @@ pub fn build_ast(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
                 }
             }
 
-            println!("name: {:?}", name);
-            println!("args: {:?}", args);
-
-            let body = vec![];
             Some(ASTNode::FunctionDefinition(FunctionDefinition::new(
                 name, args, body,
             )))
@@ -234,7 +230,6 @@ pub fn build_ast(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
         }
         Rule::value => {
             let inner_pair = pair.into_inner().next().unwrap();
-            println!("inner_pair: {:?}", inner_pair);
             let value = match inner_pair.as_rule() {
                 Rule::int => Value::Int(inner_pair.as_str().parse().unwrap()),
                 Rule::string => Value::String(inner_pair.as_str().to_string()),
@@ -252,7 +247,7 @@ pub fn build_ast(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
                 if let Some(ast) = ast {
                     body.push(ast);
                 } else {
-                    println!("Error parsing AST: {:?}", inner_clone);
+                    println!("Error parsing AST for if statement: {:?}", inner_clone);
                 }
             }
             Some(ASTNode::IfStatement(IfStatement {
