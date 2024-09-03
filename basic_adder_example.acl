@@ -1,0 +1,3 @@
+fn main (number_1: Int, number_2: Int) -> Int {
+    return number_1 + number_2;
+}

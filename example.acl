@@ -1,3 +1,6 @@
+// This is an example on how to use ACL to make a factorial circuit
+// However... ACL is not ready for this yet
+
 fn factorial(num: Int) -> Int {
     if num == 0 {
         return 1;

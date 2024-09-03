@@ -5,9 +5,9 @@ struct Program {
 }
 
 #[derive(Debug)]
-enum Type {
+pub enum Type {
     Int,
-    String,
+    String, // this one doesn't actually work yet...
 }
 
 impl Type {
@@ -21,7 +21,7 @@ impl Type {
 }
 
 #[derive(Debug)]
-struct FunctionDefinition {
+pub struct FunctionDefinition {
     name: String,
     args: Vec<(String, Type)>,
     return_type: Option<Type>,

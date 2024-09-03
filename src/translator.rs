@@ -1,8 +1,8 @@
 //! turns functions into circuits
 
-use crate::ASTNode;
+use crate::{ASTNode, FunctionDefinition};
 
-struct Circuit {
+pub struct Circuit {
     parts: Vec<Box<dyn Part>>,
     connections: Vec<(usize, usize)>,
     inputs: Vec<(usize, usize)>,  // (part_index, input_index)
@@ -46,59 +46,11 @@ impl Part for Circuit {
     }
 }
 
-trait Part {
+pub trait Part {
     fn test(&self, input: Vec<f64>) -> Vec<f64>;
     fn get_name(&self) -> String;
     fn get_input_size(&self) -> usize;
     fn get_output_size(&self) -> usize;
-}
-
-struct Adder {}
-
-impl Part for Adder {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        let mut output = vec![];
-        for i in 0..input.len() {
-            output.push(input[i] + input[i + 1]);
-        }
-        output
-    }
-
-    fn get_name(&self) -> String {
-        "Adder".to_string()
-    }
-
-    fn get_input_size(&self) -> usize {
-        2
-    }
-
-    fn get_output_size(&self) -> usize {
-        1
-    }
-}
-
-struct Multiplier {}
-
-impl Part for Multiplier {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        let mut output = vec![];
-        for i in 0..input.len() {
-            output.push(input[i] * input[i + 1]);
-        }
-        output
-    }
-
-    fn get_name(&self) -> String {
-        "Multiplier".to_string()
-    }
-
-    fn get_input_size(&self) -> usize {
-        2
-    }
-
-    fn get_output_size(&self) -> usize {
-        1
-    }
 }
 
 struct Constant {
@@ -149,7 +101,25 @@ impl Part for Resistor {
 struct Translator {}
 
 impl Translator {
-    fn translate_function_def(&self, node: ASTNode) -> Circuit {
+    fn translate_function_def(&self, node: FunctionDefinition) -> Circuit {
         unimplemented!()
+    }
+
+    fn translate_ast(&self, node: ASTNode) -> Circuit {
+        match node {
+            ASTNode::Program(nodes) => {
+                let mut circuit = Circuit::new();
+                for node in nodes {
+                    let sub_circuit = self.translate_ast(node);
+                    for part in sub_circuit.parts {
+                        circuit.add_part(part);
+                    }
+                }
+                circuit
+            }
+            ASTNode::FunctionDefinition(func_def) => self.translate_function_def(func_def),
+
+            _ => unimplemented!(),
+        }
     }
 }
