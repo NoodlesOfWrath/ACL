@@ -102,7 +102,31 @@ struct Translator {}
 
 impl Translator {
     fn translate_function_def(&self, node: FunctionDefinition) -> Circuit {
-        unimplemented!()
+        let mut circuit = Circuit::new();
+
+        // translate the body of the function
+        for sub_node in node.get_body() {
+            match sub_node {
+                ASTNode::Return(_) => {
+                    // get the circuit for the expression
+                    let internal_circuit = self.translate_ast(*sub_node);
+
+                    let index = circuit.parts.len();
+                    // add the internal circuit to the main circuit
+                    circuit.add_part(Box::new(internal_circuit));
+
+                    // return statement means this is the output of the circuit
+                    // connect the output of the internal circuit to the output of the main circuit
+                    circuit.connect(index, circuit.outputs[0].0);
+                }
+                _ => {
+                    let sub_circuit = self.translate_ast(sub_node);
+                    circuit.add_part(Box::new(sub_circuit));
+                }
+            }
+        }
+
+        circuit
     }
 
     fn translate_ast(&self, node: ASTNode) -> Circuit {
@@ -118,7 +142,14 @@ impl Translator {
                 circuit
             }
             ASTNode::FunctionDefinition(func_def) => self.translate_function_def(func_def),
+            ASTNode::Return(_) => {
+                // get the circuit for the expression
+                let internal_circuit = self.translate_ast(*node);
 
+                // return statement means this is the output of the circuit
+                // so we need to connect the output of the internal circuit to the output of the main circuit
+                let output_index = internal_circuit.outputs[0];
+            }
             _ => unimplemented!(),
         }
     }

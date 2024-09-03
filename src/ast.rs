@@ -4,7 +4,7 @@ struct Program {
     nodes: Vec<ASTNode>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Type {
     Int,
     String, // this one doesn't actually work yet...
@@ -29,7 +29,7 @@ pub struct FunctionDefinition {
 }
 
 impl FunctionDefinition {
-    fn new(
+    pub fn new(
         name: String,
         args: Vec<(String, Type)>,
         body: Vec<ASTNode>,
@@ -43,7 +43,7 @@ impl FunctionDefinition {
         }
     }
 
-    fn check_compatibility(&self, other: &FunctionCall) -> bool {
+    pub fn check_compatibility(&self, other: &FunctionCall) -> bool {
         if self.name != other.name {
             return false;
         }
@@ -57,6 +57,22 @@ impl FunctionDefinition {
         unimplemented!("Check for argument types in function calls");
 
         //true
+    }
+
+    pub fn get_return_type(&self) -> Option<Type> {
+        self.return_type
+    }
+
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn get_args(&self) -> &Vec<(String, Type)> {
+        &self.args
+    }
+
+    pub fn get_body(&self) -> &Vec<ASTNode> {
+        &self.body
     }
 }
 
