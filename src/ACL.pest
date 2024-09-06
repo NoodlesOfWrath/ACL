@@ -5,7 +5,7 @@ outer_statement = _{ function_def}
 
 function_def= { "fn" ~ identifier ~ "(" ~ params? ~ ")" ~ return_type? ~ function_body }
 return_type= { "->" ~ value_type}
-function_body = { "{" ~ (inner_statement +)* ~ "}" }
+function_body = { oppening_bracket ~ (inner_statement +)* ~ closing_bracket }
 inner_statement = _{ inner_statements_with_semicolon | if_statement}
 inner_statements_with_semicolon = _{ (return_statement | assignment | function_call) ~ ";" }
 params = { param ~ ("," ~ param)* }
@@ -36,8 +36,9 @@ value = { int | string }
 string = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 int = @{ ASCII_DIGIT+ }
 
-
-if_statement= { "if" ~ expression ~ "{" ~ (inner_statement +)* ~ "}" ~ ("else" ~ "{" ~ (inner_statement +)* ~ "}")? }
+oppening_bracket = { "{" }
+closing_bracket = { "}" }
+if_statement= { "if" ~ expression ~ oppening_bracket ~ (inner_statement +)* ~ closing_bracket ~ ("else" ~ oppening_bracket ~ (inner_statement +)* ~ closing_bracket)? }
 return_statement = { "return" ~ expression }
 
 WHITESPACE = _{ " " | "\t" | "\n" | "\r" }

@@ -1,5 +1,7 @@
 //! turns functions into circuits
 
+use std::{collections::HashMap, hash::Hash};
+
 use crate::{ASTNode, FunctionDefinition};
 
 pub struct Circuit {
@@ -98,10 +100,33 @@ impl Part for Resistor {
     }
 }
 
-struct Translator {}
+#[derive(Clone)]
+struct VariableInfo {
+    index: usize,
+}
+
+#[derive(Clone)]
+struct ScopeInfo {
+    variables: HashMap<String, VariableInfo>,
+}
+
+struct Translator {
+    scope_defs: Vec<ScopeInfo>,
+}
 
 impl Translator {
-    fn translate_function_def(&self, node: FunctionDefinition) -> Circuit {
+    /// we copy the last scope whenever we enter a new scope
+    fn enter_scope(&mut self) {
+        self.scope_defs
+            .push(self.scope_defs.last().unwrap().clone());
+    }
+
+    /// we drop the last scope whenever we exit a scope
+    fn exit_scope(&mut self) {
+        self.scope_defs.pop();
+    }
+
+    fn translate_function_def(&mut self, node: FunctionDefinition) -> Circuit {
         let mut circuit = Circuit::new();
 
         // translate the body of the function
@@ -129,7 +154,15 @@ impl Translator {
         circuit
     }
 
-    fn translate_ast(&self, node: ASTNode) -> Circuit {
+    fn translate_if_statement(&self, node: ASTNode) -> Circuit {
+        let mut circuit = Circuit::new();
+
+        // translate the body of the function
+
+        circuit
+    }
+
+    fn translate_ast(&mut self, node: ASTNode) -> Circuit {
         match node {
             ASTNode::Program(nodes) => {
                 let mut circuit = Circuit::new();
@@ -141,7 +174,18 @@ impl Translator {
                 }
                 circuit
             }
-            ASTNode::FunctionDefinition(func_def) => self.translate_function_def(func_def),
+            ASTNode::FunctionDefinition(func_def) => {
+                self.enter_scope();
+                let node = self.translate_function_def(func_def);
+                self.exit_scope();
+                node
+            }
+            ASTNode::IfStatement(_) => {
+                self.enter_scope();
+                let node = self.translate_if_statement(node);
+                self.exit_scope();
+                node
+            }
             ASTNode::Return(_) => {
                 panic!("return statement not handled by function definition")
             }

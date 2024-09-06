@@ -92,7 +92,7 @@ pub enum ASTNode {
 }
 
 #[derive(Debug, Clone)]
-struct IfStatement {
+pub struct IfStatement {
     condition: Box<Expression>,
     body: Vec<ASTNode>,
 }
