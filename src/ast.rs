@@ -20,7 +20,7 @@ impl Type {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionDefinition {
     name: String,
     args: Vec<(String, Type)>,
@@ -76,13 +76,13 @@ impl FunctionDefinition {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FunctionCall {
     name: String,
     args: Vec<ASTNode>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ASTNode {
     Program(Vec<ASTNode>),
     FunctionDefinition(FunctionDefinition),
@@ -91,13 +91,13 @@ pub enum ASTNode {
     IfStatement(IfStatement),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct IfStatement {
     condition: Box<Expression>,
     body: Vec<ASTNode>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     Dyadic(Dyadic),
     Value(Value),
@@ -106,14 +106,14 @@ pub enum Expression {
     FunctionCall(FunctionCall),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Dyadic {
     pub left: Box<Expression>,
     pub operator: Operator,
     pub right: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Operator {
     Plus,
     Minus,
@@ -127,7 +127,7 @@ pub enum Operator {
     GreaterThanOrEqual,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Int(i32),
     String(String),

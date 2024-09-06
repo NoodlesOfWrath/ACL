@@ -109,7 +109,7 @@ impl Translator {
             match sub_node {
                 ASTNode::Return(_) => {
                     // get the circuit for the expression
-                    let internal_circuit = self.translate_ast(*sub_node);
+                    let internal_circuit = self.translate_ast(sub_node.clone());
 
                     let index = circuit.parts.len();
                     // add the internal circuit to the main circuit
@@ -120,7 +120,7 @@ impl Translator {
                     circuit.connect(index, circuit.outputs[0].0);
                 }
                 _ => {
-                    let sub_circuit = self.translate_ast(sub_node);
+                    let sub_circuit = self.translate_ast(sub_node.clone());
                     circuit.add_part(Box::new(sub_circuit));
                 }
             }
@@ -143,12 +143,7 @@ impl Translator {
             }
             ASTNode::FunctionDefinition(func_def) => self.translate_function_def(func_def),
             ASTNode::Return(_) => {
-                // get the circuit for the expression
-                let internal_circuit = self.translate_ast(*node);
-
-                // return statement means this is the output of the circuit
-                // so we need to connect the output of the internal circuit to the output of the main circuit
-                let output_index = internal_circuit.outputs[0];
+                panic!("return statement not handled by function definition")
             }
             _ => unimplemented!(),
         }
