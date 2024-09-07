@@ -113,6 +113,20 @@ pub struct Dyadic {
     pub right: Box<Expression>,
 }
 
+impl Dyadic {
+    pub fn get_left(&self) -> &Expression {
+        &self.left
+    }
+
+    pub fn get_right(&self) -> &Expression {
+        &self.right
+    }
+
+    pub fn get_operator(&self) -> &Operator {
+        &self.operator
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Operator {
     Plus,

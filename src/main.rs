@@ -30,6 +30,9 @@ fn main() {
             }
             let node = ASTNode::Program(all_nodes);
             println!("{:#?}", node);
+
+            let mut translator = translator::Translator::new();
+            let circuit = translator.translate_ast(node);
         }
         Err(e) => println!("Parsing error: {}", e),
     }

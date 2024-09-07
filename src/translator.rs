@@ -2,7 +2,10 @@
 
 use std::{collections::HashMap, hash::Hash};
 
-use crate::{ASTNode, FunctionDefinition};
+use crate::{
+    sub_circuits::{Adder, Divider, Multiplier, Subtractor},
+    ASTNode, Expression, FunctionDefinition,
+};
 
 pub struct Circuit {
     parts: Vec<Box<dyn Part>>,
@@ -110,11 +113,26 @@ struct ScopeInfo {
     variables: HashMap<String, VariableInfo>,
 }
 
-struct Translator {
+pub struct Translator {
     scope_defs: Vec<ScopeInfo>,
 }
 
 impl Translator {
+    pub fn new() -> Self {
+        Translator {
+            scope_defs: vec![ScopeInfo {
+                variables: HashMap::new(),
+            }],
+        }
+    }
+
+    /// get the index of a variable in the current scope
+    pub fn get_variable_index(&mut self, ident: String) -> usize {
+        let scope = self.scope_defs.last().unwrap();
+        let var_info = scope.variables.get(&ident).unwrap();
+        var_info.index
+    }
+
     /// we copy the last scope whenever we enter a new scope
     fn enter_scope(&mut self) {
         self.scope_defs
@@ -162,7 +180,7 @@ impl Translator {
         circuit
     }
 
-    fn translate_ast(&mut self, node: ASTNode) -> Circuit {
+    pub fn translate_ast(&mut self, node: ASTNode) -> Circuit {
         match node {
             ASTNode::Program(nodes) => {
                 let mut circuit = Circuit::new();
@@ -176,7 +194,9 @@ impl Translator {
             }
             ASTNode::FunctionDefinition(func_def) => {
                 self.enter_scope();
+                println!("entering scope");
                 let node = self.translate_function_def(func_def);
+                println!("exiting scope");
                 self.exit_scope();
                 node
             }
@@ -186,10 +206,51 @@ impl Translator {
                 self.exit_scope();
                 node
             }
-            ASTNode::Return(_) => {
-                panic!("return statement not handled by function definition")
+            ASTNode::Return(inner_expr) => {
+                let sub_circuit = self.translate_ast(*inner_expr);
+                sub_circuit
             }
-            _ => unimplemented!(),
+            ASTNode::Expression(expr) => {
+                let circuit = self.translate_expression(expr);
+                circuit
+            }
+            _ => panic!("{:?} couldn't be handled", node),
+        }
+    }
+
+    fn translate_expression(&mut self, expr: Expression) -> Circuit {
+        let mut circuit = Circuit::new();
+
+        match expr {
+            Expression::Dyadic(dyadic) => {
+                let left_node = ASTNode::Expression(dyadic.get_left().clone());
+                let right_node = ASTNode::Expression(dyadic.get_right().clone());
+                let left_circuit = self.translate_ast(left_node);
+                let right_circuit = self.translate_ast(right_node);
+
+                circuit.add_part(Box::new(left_circuit));
+                circuit.add_part(Box::new(right_circuit));
+
+                // connect the output of the left circuit to the input of the right circuit
+                circuit.connect(0, 1);
+            }
+            Expression::Identifier(ident) => {
+                let var_index = self.get_variable_index(ident);
+                
+            }
+            _ => panic!("{:#?} not yet implemented", expr),
+        }
+
+        circuit
+    }
+
+    fn get_operator_circuit(&self, operator: &str) -> Box<dyn Part> {
+        match operator {
+            "+" => Box::new(Adder {}),
+            "-" => Box::new(Subtractor {}),
+            "*" => Box::new(Multiplier {}),
+            "/" => Box::new(Divider {}),
+            _ => panic!("{} is not yet implemented", operator),
         }
     }
 }

@@ -36,8 +36,8 @@ value = { int | string }
 string = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 int = @{ ASCII_DIGIT+ }
 
-oppening_bracket = { "{" }
-closing_bracket = { "}" }
+oppening_bracket = _{ "{" }
+closing_bracket = _{ "}" }
 if_statement= { "if" ~ expression ~ oppening_bracket ~ (inner_statement +)* ~ closing_bracket ~ ("else" ~ oppening_bracket ~ (inner_statement +)* ~ closing_bracket)? }
 return_statement = { "return" ~ expression }
 
