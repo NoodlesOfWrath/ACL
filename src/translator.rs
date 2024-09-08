@@ -4,7 +4,7 @@ use std::{collections::HashMap, hash::Hash};
 
 use crate::{
     sub_circuits::{Adder, Divider, Multiplier, Subtractor},
-    ASTNode, Expression, FunctionDefinition,
+    ASTNode, Expression, FunctionDefinition, Operator,
 };
 
 pub struct Circuit {
@@ -12,6 +12,15 @@ pub struct Circuit {
     connections: Vec<(usize, usize)>,
     inputs: Vec<(usize, usize)>,  // (part_index, input_index)
     outputs: Vec<(usize, usize)>, // (part_index, output_index)
+    // I don't really like the idea of having to keep track of the next input/output index
+    // but I can't think of a better way to do it other than summing the input/output sizes of all the parts every single time
+    next_input_index: usize,
+    next_output_index: usize,
+}
+
+struct PartInfo {
+    input_offset: usize, // the first input will be at input_offset then the next will be at input_offset + 1 etc
+    output_offset: usize, // the same as input_offset but for outputs
 }
 
 impl Circuit {
@@ -21,11 +30,27 @@ impl Circuit {
             connections: vec![],
             inputs: vec![],
             outputs: vec![],
+            next_input_index: 0,
+            next_output_index: 0,
         }
     }
 
-    fn add_part(&mut self, part: Box<dyn Part>) {
+    fn add_part(&mut self, part: Box<dyn Part>) -> PartInfo {
+        let part_info = PartInfo {
+            input_offset: self.next_input_index,
+            output_offset: self.next_output_index,
+        };
+
+        // get the size of the inputs and outputs of the part
+        let input_size = part.get_input_size();
+        let output_size = part.get_output_size();
+        // update the next input/output index
+        self.next_input_index += input_size;
+        self.next_output_index += output_size;
+
         self.parts.push(part);
+
+        part_info
     }
 
     fn connect(&mut self, from: usize, to: usize) {
@@ -144,113 +169,126 @@ impl Translator {
         self.scope_defs.pop();
     }
 
-    fn translate_function_def(&mut self, node: FunctionDefinition) -> Circuit {
-        let mut circuit = Circuit::new();
-
+    fn translate_function_def(&mut self, node: FunctionDefinition, circuit: &mut Circuit) -> usize {
         // translate the body of the function
         for sub_node in node.get_body() {
             match sub_node {
                 ASTNode::Return(_) => {
                     // get the circuit for the expression
-                    let internal_circuit = self.translate_ast(sub_node.clone());
-
-                    let index = circuit.parts.len();
-                    // add the internal circuit to the main circuit
-                    circuit.add_part(Box::new(internal_circuit));
+                    let internal_output_index =
+                        self.translate_ast_internal(sub_node.clone(), circuit);
 
                     // return statement means this is the output of the circuit
                     // connect the output of the internal circuit to the output of the main circuit
-                    circuit.connect(index, circuit.outputs[0].0);
+                    circuit.connect(internal_output_index, circuit.outputs[0].0);
                 }
                 _ => {
-                    let sub_circuit = self.translate_ast(sub_node.clone());
-                    circuit.add_part(Box::new(sub_circuit));
+                    let output_index = self.translate_ast_internal(sub_node.clone(), circuit);
                 }
             }
         }
 
-        circuit
+        unimplemented!()
     }
 
-    fn translate_if_statement(&self, node: ASTNode) -> Circuit {
-        let mut circuit = Circuit::new();
-
+    fn translate_if_statement(&self, node: ASTNode, circuit: &mut Circuit) -> usize {
         // translate the body of the function
-
-        circuit
+        unimplemented!()
     }
 
-    pub fn translate_ast(&mut self, node: ASTNode) -> Circuit {
+    /// Outputs the index of the output of the circuit
+    pub fn translate_ast_internal(&mut self, node: ASTNode, circuit: &mut Circuit) -> usize {
         match node {
             ASTNode::Program(nodes) => {
                 let mut circuit = Circuit::new();
+                let mut output_index = None;
                 for node in nodes {
-                    let sub_circuit = self.translate_ast(node);
-                    for part in sub_circuit.parts {
-                        circuit.add_part(part);
+                    match node {
+                        ASTNode::FunctionDefinition(func_def) => {
+                            if func_def.get_name() == "main" {
+                                if output_index.is_some() {
+                                    panic!("main function already defined");
+                                }
+
+                                output_index =
+                                    Some(self.translate_function_def(func_def, &mut circuit));
+                            } else {
+                                self.translate_function_def(func_def, &mut circuit);
+                            }
+                        }
+                        _ => (),
                     }
                 }
-                circuit
+
+                if output_index.is_none() {
+                    panic!("main function not defined");
+                }
+
+                0 // TODO: this is a placeholder, it should output the main output of the circuit
             }
             ASTNode::FunctionDefinition(func_def) => {
                 self.enter_scope();
                 println!("entering scope");
-                let node = self.translate_function_def(func_def);
+                let output_index = self.translate_function_def(func_def, circuit);
                 println!("exiting scope");
                 self.exit_scope();
-                node
+                output_index
             }
             ASTNode::IfStatement(_) => {
                 self.enter_scope();
-                let node = self.translate_if_statement(node);
+                let output_index = self.translate_if_statement(node, circuit);
                 self.exit_scope();
-                node
+                output_index
             }
             ASTNode::Return(inner_expr) => {
                 let sub_circuit = self.translate_ast(*inner_expr);
-                sub_circuit
+                let info = circuit.add_part(Box::new(sub_circuit));
+                info.output_offset
             }
-            ASTNode::Expression(expr) => {
-                let circuit = self.translate_expression(expr);
-                circuit
-            }
+            ASTNode::Expression(expr) => self.translate_expression(expr, circuit),
             _ => panic!("{:?} couldn't be handled", node),
         }
     }
 
-    fn translate_expression(&mut self, expr: Expression) -> Circuit {
+    pub fn translate_ast(&mut self, node: ASTNode) -> Circuit {
         let mut circuit = Circuit::new();
+        self.translate_ast_internal(node, &mut circuit);
+        circuit
+    }
 
+    fn translate_expression(&mut self, expr: Expression, circuit: &mut Circuit) -> usize {
         match expr {
             Expression::Dyadic(dyadic) => {
                 let left_node = ASTNode::Expression(dyadic.get_left().clone());
                 let right_node = ASTNode::Expression(dyadic.get_right().clone());
-                let left_circuit = self.translate_ast(left_node);
-                let right_circuit = self.translate_ast(right_node);
+                let left_circuit_output_index = self.translate_ast_internal(left_node, circuit);
+                let right_circuit_output_index = self.translate_ast_internal(right_node, circuit);
 
-                circuit.add_part(Box::new(left_circuit));
-                circuit.add_part(Box::new(right_circuit));
+                let operator_circuit = self.get_operator_circuit(dyadic.get_operator());
+                let operator_info = circuit.add_part(operator_circuit);
 
-                // connect the output of the left circuit to the input of the right circuit
-                circuit.connect(0, 1);
+                // connect the inputs of the operator to the outputs of the left and right circuits
+                circuit.connect(left_circuit_output_index, operator_info.input_offset);
+                circuit.connect(right_circuit_output_index, operator_info.input_offset + 1);
+
+                operator_info.output_offset // assuming the operator has only one output
             }
             Expression::Identifier(ident) => {
                 let var_index = self.get_variable_index(ident);
-                
+                // output the index of the variable
+                var_index
             }
             _ => panic!("{:#?} not yet implemented", expr),
         }
-
-        circuit
     }
 
-    fn get_operator_circuit(&self, operator: &str) -> Box<dyn Part> {
+    fn get_operator_circuit(&self, operator: &Operator) -> Box<dyn Part> {
         match operator {
-            "+" => Box::new(Adder {}),
-            "-" => Box::new(Subtractor {}),
-            "*" => Box::new(Multiplier {}),
-            "/" => Box::new(Divider {}),
-            _ => panic!("{} is not yet implemented", operator),
+            Operator::Plus => Box::new(Adder {}),
+            Operator::Minus => Box::new(Subtractor {}),
+            Operator::Multiply => Box::new(Multiplier {}),
+            Operator::Divide => Box::new(Divider {}),
+            _ => panic!("{:?} not yet implemented", operator),
         }
     }
 }
