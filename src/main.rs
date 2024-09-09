@@ -4,6 +4,7 @@ extern crate pest_derive;
 use pest::{pratt_parser::PrattParser, Parser};
 mod ast;
 use ast::*;
+use translator::Part;
 mod sub_circuits;
 mod translator;
 

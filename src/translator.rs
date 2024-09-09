@@ -56,6 +56,20 @@ impl Circuit {
     fn connect(&mut self, from: usize, to: usize) {
         self.connections.push((from, to));
     }
+
+    // add an input to the circuit
+    fn add_input(&mut self) -> usize {
+        let input_index = self.next_input_index;
+        self.next_input_index += 1;
+        input_index
+    }
+
+    // add an output to the circuit
+    fn add_output(&mut self) -> usize {
+        let output_index = self.next_output_index;
+        self.next_output_index += 1;
+        output_index
+    }
 }
 
 impl Part for Circuit {
@@ -169,7 +183,26 @@ impl Translator {
         self.scope_defs.pop();
     }
 
-    fn translate_function_def(&mut self, node: FunctionDefinition, circuit: &mut Circuit) -> usize {
+    fn translate_function_def(
+        &mut self,
+        node: FunctionDefinition,
+        circuit: &mut Circuit,
+    ) -> Option<usize> {
+        // add the inputs of the function to the circuit
+        for input in node.get_args() {
+            let input_index = circuit.add_input();
+            let var_info = VariableInfo { index: input_index };
+            let name = input.0.clone();
+            // the type isn't used for now
+            self.scope_defs
+                .last_mut()
+                .unwrap()
+                .variables
+                .insert(name, var_info);
+        }
+
+        let mut output_index = None;
+
         // translate the body of the function
         for sub_node in node.get_body() {
             match sub_node {
@@ -180,15 +213,17 @@ impl Translator {
 
                     // return statement means this is the output of the circuit
                     // connect the output of the internal circuit to the output of the main circuit
-                    circuit.connect(internal_output_index, circuit.outputs[0].0);
+                    let new_output_index = circuit.add_output();
+                    circuit.connect(internal_output_index, new_output_index);
+                    output_index = Some(new_output_index);
                 }
                 _ => {
-                    let output_index = self.translate_ast_internal(sub_node.clone(), circuit);
+                    let _output_index = self.translate_ast_internal(sub_node.clone(), circuit);
                 }
             }
         }
 
-        unimplemented!()
+        output_index
     }
 
     fn translate_if_statement(&self, node: ASTNode, circuit: &mut Circuit) -> usize {
@@ -232,7 +267,7 @@ impl Translator {
                 let output_index = self.translate_function_def(func_def, circuit);
                 println!("exiting scope");
                 self.exit_scope();
-                output_index
+                output_index.expect("don't yet support functions without return statements")
             }
             ASTNode::IfStatement(_) => {
                 self.enter_scope();
