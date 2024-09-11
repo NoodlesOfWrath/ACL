@@ -11,8 +11,8 @@ use crate::{
 pub struct Circuit {
     parts: Vec<Box<dyn Part>>,
     connections: Vec<(usize, usize)>,
-    inputs: Vec<(usize, usize)>,  // (part_index, input_index)
-    outputs: Vec<(usize, usize)>, // (part_index, output_index)
+    program_inputs: Vec<usize>,
+    program_outputs: Vec<usize>,
     // I don't really like the idea of having to keep track of the next input/output index
     // but I can't think of a better way to do it other than summing the input/output sizes of all the parts every single time
     next_input_index: usize,
@@ -29,8 +29,8 @@ impl Circuit {
         Circuit {
             parts: vec![],
             connections: vec![],
-            inputs: vec![],
-            outputs: vec![],
+            program_inputs: vec![],
+            program_outputs: vec![],
             next_input_index: 0,
             next_output_index: 0,
         }
@@ -59,17 +59,19 @@ impl Circuit {
     }
 
     // add an input to the circuit
-    fn add_input(&mut self) -> usize {
-        let input_index = self.next_input_index;
+    fn add_program_input(&mut self) -> usize {
+        let index = self.next_input_index;
+        self.program_inputs.push(index);
         self.next_input_index += 1;
-        input_index
+        index
     }
 
     // add an output to the circuit
-    fn add_output(&mut self) -> usize {
-        let output_index = self.next_output_index;
+    fn add_program_output(&mut self) -> usize {
+        let index = self.next_output_index;
+        self.program_outputs.push(index);
         self.next_output_index += 1;
-        output_index
+        index
     }
 }
 
@@ -155,6 +157,18 @@ struct ScopeInfo {
     variables: HashMap<String, VariableInfo>,
 }
 
+impl ScopeInfo {
+    fn new() -> Self {
+        ScopeInfo {
+            variables: HashMap::new(),
+        }
+    }
+
+    fn add_variable(&mut self, name: String, index: usize) {
+        self.variables.insert(name, VariableInfo { index });
+    }
+}
+
 pub struct Translator {
     scope_defs: Vec<ScopeInfo>,
 }
@@ -186,6 +200,11 @@ impl Translator {
         self.scope_defs.pop();
     }
 
+    fn get_current_scope(&mut self) -> &mut ScopeInfo {
+        // i think expecting here is fine since we should always have a scope if this is being called
+        self.scope_defs.last_mut().expect("no scope to get")
+    }
+
     fn translate_function_def(
         &mut self,
         node: FunctionDefinition,
@@ -193,15 +212,12 @@ impl Translator {
     ) -> Option<usize> {
         // add the inputs of the function to the circuit
         for input in node.get_args() {
-            let input_index = circuit.add_input();
-            let var_info = VariableInfo { index: input_index };
+            println!("adding input {:?}", input);
+            let input_index = circuit.add_program_input();
             let name = input.0.clone();
+
             // the type isn't used for now
-            self.scope_defs
-                .last_mut()
-                .unwrap()
-                .variables
-                .insert(name, var_info);
+            self.get_current_scope().add_variable(name, input_index);
         }
 
         let mut output_index = None;
@@ -216,7 +232,7 @@ impl Translator {
 
                     // return statement means this is the output of the circuit
                     // connect the output of the internal circuit to the output of the main circuit
-                    let new_output_index = circuit.add_output();
+                    let new_output_index = circuit.add_program_output();
                     circuit.connect(internal_output_index, new_output_index);
                     output_index = Some(new_output_index);
                 }
@@ -238,7 +254,6 @@ impl Translator {
     pub fn translate_ast_internal(&mut self, node: ASTNode, circuit: &mut Circuit) -> usize {
         match node {
             ASTNode::Program(nodes) => {
-                let mut circuit = Circuit::new();
                 let mut output_index = None;
                 for node in nodes {
                     match node {
@@ -248,10 +263,9 @@ impl Translator {
                                     panic!("main function already defined");
                                 }
 
-                                output_index =
-                                    Some(self.translate_function_def(func_def, &mut circuit));
+                                output_index = self.translate_function_def(func_def, circuit);
                             } else {
-                                self.translate_function_def(func_def, &mut circuit);
+                                self.translate_function_def(func_def, circuit);
                             }
                         }
                         _ => (),
@@ -259,10 +273,10 @@ impl Translator {
                 }
 
                 if output_index.is_none() {
-                    panic!("main function not defined");
+                    panic!("main function not defined or doesn't return anything");
                 }
 
-                0 // TODO: this is a placeholder, it should output the main output of the circuit
+                output_index.unwrap()
             }
             ASTNode::FunctionDefinition(func_def) => {
                 self.enter_scope();
