@@ -1,12 +1,13 @@
 //! turns functions into circuits
 
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 use crate::{
     sub_circuits::{Adder, Divider, Multiplier, Subtractor},
     ASTNode, Expression, FunctionDefinition, Operator,
 };
 
+#[derive(Debug)]
 pub struct Circuit {
     parts: Vec<Box<dyn Part>>,
     connections: Vec<(usize, usize)>,
@@ -90,13 +91,14 @@ impl Part for Circuit {
     }
 }
 
-pub trait Part {
+pub trait Part: Debug {
     fn test(&self, input: Vec<f64>) -> Vec<f64>;
     fn get_name(&self) -> String;
     fn get_input_size(&self) -> usize;
     fn get_output_size(&self) -> usize;
 }
 
+#[derive(Debug)]
 struct Constant {
     value: f64,
 }
@@ -119,6 +121,7 @@ impl Part for Constant {
     }
 }
 
+#[derive(Debug)]
 struct Resistor {
     resistance: f64, // ohms
 }

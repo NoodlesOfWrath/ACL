@@ -34,6 +34,7 @@ fn main() {
 
             let mut translator = translator::Translator::new();
             let circuit = translator.translate_ast(node);
+            println!("{:#?}", circuit);
         }
         Err(e) => println!("Parsing error: {}", e),
     }
