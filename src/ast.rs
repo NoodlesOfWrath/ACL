@@ -77,7 +77,7 @@ impl FunctionDefinition {
 }
 
 #[derive(Debug, Clone)]
-struct FunctionCall {
+pub struct FunctionCall {
     name: String,
     args: Vec<ASTNode>,
 }

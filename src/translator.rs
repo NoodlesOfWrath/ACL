@@ -171,6 +171,7 @@ impl ScopeInfo {
 
 pub struct Translator {
     scope_defs: Vec<ScopeInfo>,
+    function_defs: Vec<FunctionDefinition>,
 }
 
 impl Translator {
@@ -179,6 +180,7 @@ impl Translator {
             scope_defs: vec![ScopeInfo {
                 variables: HashMap::new(),
             }],
+            function_defs: vec![],
         }
     }
 
@@ -295,6 +297,7 @@ impl Translator {
                 info.output_offset
             }
             ASTNode::Expression(expr) => self.translate_expression(expr, circuit),
+
             _ => panic!("{:?} couldn't be handled", node),
         }
     }
@@ -326,6 +329,11 @@ impl Translator {
                 let var_index = self.get_variable_index(ident);
                 // output the index of the variable
                 var_index
+            }
+            Expression::FunctionCall(call) => {
+                // This will take a lot of thought. Some sort of structure where it can guarentee the function isn't being used twice at the same time
+                // And if it is instatiate a new version
+                panic!("Function calls are not yet implemented.")
             }
             _ => panic!("{:#?} not yet implemented", expr),
         }
