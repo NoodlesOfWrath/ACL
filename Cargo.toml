@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 pest = "2.5"
 pest_derive = "2.5"
+
+[dev-dependencies]
+test_each_file = "0.3.3"

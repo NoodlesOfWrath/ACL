@@ -134,6 +134,7 @@ version = "0.1.0"
 dependencies = [
  "pest",
  "pest_derive",
+ "test_each_file",
 ]
 
 [[package]]
@@ -164,6 +165,18 @@ checksum = "9f35bcdf61fd8e7be6caf75f429fdca8beb3ed76584befb503b1569faee373ed"
 dependencies = [
  "proc-macro2",
  "quote",
+ "unicode-ident",
+]
+
+[[package]]
+name = "test_each_file"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9576037ae2a919664866c736156fd646d1c0e4e217244b1da05f56204dd6c61"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
  "unicode-ident",
 ]
 
