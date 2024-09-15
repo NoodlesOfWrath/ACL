@@ -212,7 +212,6 @@ impl Translator {
     ) -> Option<usize> {
         // add the inputs of the function to the circuit
         for input in node.get_args() {
-            println!("adding input {:?}", input);
             let input_index = circuit.add_program_input();
             let name = input.0.clone();
 
@@ -280,9 +279,7 @@ impl Translator {
             }
             ASTNode::FunctionDefinition(func_def) => {
                 self.enter_scope();
-                println!("entering scope");
                 let output_index = self.translate_function_def(func_def, circuit);
-                println!("exiting scope");
                 self.exit_scope();
                 output_index.expect("don't yet support functions without return statements")
             }

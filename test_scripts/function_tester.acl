@@ -1,0 +1,8 @@
+fn main (number_1: Int, number_2: Int) -> Int {
+    return add(number_1, number_2);
+}
+
+// obviously not needed, just to test the function call
+fn add (number_1: Int, number_2: Int) -> Int {
+    return number_1 + number_2;
+}
