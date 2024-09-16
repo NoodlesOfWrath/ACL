@@ -82,6 +82,20 @@ pub struct FunctionCall {
     args: Vec<ASTNode>,
 }
 
+impl FunctionCall {
+    pub fn new(name: String, args: Vec<ASTNode>) -> Self {
+        FunctionCall { name, args }
+    }
+
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn get_args(&self) -> &Vec<ASTNode> {
+        &self.args
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum ASTNode {
     Program(Vec<ASTNode>),

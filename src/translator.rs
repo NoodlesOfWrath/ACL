@@ -7,9 +7,9 @@ use crate::{
     ASTNode, Expression, FunctionDefinition, Operator,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Circuit {
-    parts: Vec<Box<dyn Part>>,
+    parts: Vec<Box<dyn PartInternal>>,
     connections: Vec<(usize, usize)>,
     program_inputs: Vec<usize>,
     program_outputs: Vec<usize>,
@@ -17,11 +17,78 @@ pub struct Circuit {
     // but I can't think of a better way to do it other than summing the input/output sizes of all the parts every single time
     next_input_index: usize,
     next_output_index: usize,
+    name: Option<String>,
 }
 
-struct PartInfo {
-    input_offset: usize, // the first input will be at input_offset then the next will be at input_offset + 1 etc
-    output_offset: usize, // the same as input_offset but for outputs
+// an object safe version of Part
+trait PartInternal {
+    fn test(&self, input: Vec<f64>) -> Vec<f64>;
+    fn get_name(&self) -> String;
+    fn get_input_size(&self) -> usize;
+    fn get_output_size(&self) -> usize;
+    fn clone_internal(&self) -> Box<dyn PartInternal>;
+    fn debug(&'static self) -> Box<dyn Debug>;
+}
+
+impl<T> PartInternal for T
+where
+    T: Part + 'static,
+{
+    fn test(&self, input: Vec<f64>) -> Vec<f64> {
+        Part::test(self, input)
+    }
+
+    fn get_name(&self) -> String {
+        Part::get_name(self)
+    }
+
+    fn get_input_size(&self) -> usize {
+        Part::get_input_size(self)
+    }
+
+    fn get_output_size(&self) -> usize {
+        Part::get_output_size(self)
+    }
+
+    fn clone_internal(&self) -> Box<dyn PartInternal> {
+        let part: Box<dyn PartInternal> = Box::new(self.clone()) as Box<dyn PartInternal>;
+        part
+    }
+
+    fn debug(&'static self) -> Box<dyn Debug> {
+        Part::as_debug(self)
+    }
+}
+
+impl Debug for dyn PartInternal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.get_name())
+    }
+}
+
+impl Clone for Box<dyn PartInternal> {
+    fn clone(&self) -> Self {
+        self.clone_internal()
+    }
+}
+
+impl Part for Circuit {
+    fn test(&self, input: Vec<f64>) -> Vec<f64> {
+        // for now just return the input
+        input
+    }
+
+    fn get_name(&self) -> String {
+        self.name.clone().unwrap_or("Unnamed Circuit".to_string())
+    }
+
+    fn get_input_size(&self) -> usize {
+        self.next_input_index
+    }
+
+    fn get_output_size(&self) -> usize {
+        self.next_output_index
+    }
 }
 
 impl Circuit {
@@ -33,10 +100,11 @@ impl Circuit {
             program_outputs: vec![],
             next_input_index: 0,
             next_output_index: 0,
+            name: None,
         }
     }
 
-    fn add_part(&mut self, part: Box<dyn Part>) -> PartInfo {
+    fn add_part(&mut self, part: impl PartInternal + 'static) -> PartInfo {
         let part_info = PartInfo {
             input_offset: self.next_input_index,
             output_offset: self.next_output_index,
@@ -49,7 +117,7 @@ impl Circuit {
         self.next_input_index += input_size;
         self.next_output_index += output_size;
 
-        self.parts.push(part);
+        self.parts.push(Box::new(part));
 
         part_info
     }
@@ -75,32 +143,22 @@ impl Circuit {
     }
 }
 
-impl Part for Circuit {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        unimplemented!()
-    }
-
-    fn get_name(&self) -> String {
-        "Circuit".to_string()
-    }
-
-    fn get_input_size(&self) -> usize {
-        0
-    }
-
-    fn get_output_size(&self) -> usize {
-        0
-    }
+struct PartInfo {
+    input_offset: usize, // the first input will be at input_offset then the next will be at input_offset + 1 etc
+    output_offset: usize, // the same as input_offset but for outputs
 }
 
-pub trait Part: Debug {
+pub trait Part: Debug + Clone {
     fn test(&self, input: Vec<f64>) -> Vec<f64>;
     fn get_name(&self) -> String;
     fn get_input_size(&self) -> usize;
     fn get_output_size(&self) -> usize;
+    fn as_debug(&'static self) -> Box<dyn Debug> {
+        Box::new(self) as Box<dyn Debug>
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Constant {
     value: f64,
 }
@@ -123,7 +181,7 @@ impl Part for Constant {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Resistor {
     resistance: f64, // ohms
 }
@@ -171,7 +229,7 @@ impl ScopeInfo {
 
 pub struct Translator {
     scope_defs: Vec<ScopeInfo>,
-    function_defs: Vec<FunctionDefinition>,
+    function_defs: HashMap<String, Circuit>,
 }
 
 impl Translator {
@@ -180,8 +238,18 @@ impl Translator {
             scope_defs: vec![ScopeInfo {
                 variables: HashMap::new(),
             }],
-            function_defs: vec![],
+            function_defs: HashMap::new(),
         }
+    }
+
+    pub fn get_function_circuit(&self, name: String) -> &Circuit {
+        self.function_defs
+            .get(&name)
+            .expect(format!("function {} not defined", name).as_str())
+    }
+
+    pub fn add_function_circuit(&mut self, name: String, circuit: Circuit) {
+        self.function_defs.insert(name, circuit);
     }
 
     /// get the index of a variable in the current scope
@@ -207,6 +275,8 @@ impl Translator {
         self.scope_defs.last_mut().expect("no scope to get")
     }
 
+    // Todo: make this behave differently, this is fine for if there is only a main function,
+    // otherwise a circuit should be returned because it needs to be instantiatable
     fn translate_function_def(
         &mut self,
         node: FunctionDefinition,
@@ -293,7 +363,7 @@ impl Translator {
             }
             ASTNode::Return(inner_expr) => {
                 let sub_circuit = self.translate_ast(*inner_expr);
-                let info = circuit.add_part(Box::new(sub_circuit));
+                let info = circuit.add_part(sub_circuit);
                 info.output_offset
             }
             ASTNode::Expression(expr) => self.translate_expression(expr, circuit),
@@ -333,7 +403,21 @@ impl Translator {
             Expression::FunctionCall(call) => {
                 // This will take a lot of thought. Some sort of structure where it can guarentee the function isn't being used twice at the same time
                 // And if it is instatiate a new version
-                panic!("Function calls are not yet implemented.")
+                //panic!("Function calls are not yet implemented.")
+                let mut output_index = None;
+                let mut arg_indices = vec![];
+                for arg in call.get_args() {
+                    let arg_index = self.translate_ast_internal(arg.clone(), circuit);
+                    arg_indices.push(arg_index);
+                }
+
+                // get the function definition
+                let function_name = call.get_name();
+                let function_circuit = self.get_function_circuit(function_name.to_string());
+                // add the function to the circuit
+                let function_info = circuit.add_part(function_circuit);
+
+                output_index.expect("function call with no arguments")
             }
             _ => panic!("{:#?} not yet implemented", expr),
         }
