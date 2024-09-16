@@ -5,14 +5,15 @@ use pest::Parser;
 mod ast;
 use ast::*;
 mod sub_circuits;
-mod test;
+#[cfg(test)]
+mod tests;
 mod translator;
 
 #[derive(Parser)]
 #[grammar = "ACL.pest"] // Specifies the grammar file
 struct HLHDLParser;
 
-const FILE: &str = "test_scripts/basic_adder_example.acl";
+const FILE: &str = "test_scripts/function_tester.acl";
 
 fn main() {
     let unparsed_file = std::fs::read_to_string(FILE).expect("cannot read file");

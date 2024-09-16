@@ -30,6 +30,32 @@ trait PartInternal {
     fn debug(&'static self) -> Box<dyn Debug>;
 }
 
+impl PartInternal for Box<dyn PartInternal> {
+    fn test(&self, input: Vec<f64>) -> Vec<f64> {
+        PartInternal::test(&**self, input)
+    }
+
+    fn get_name(&self) -> String {
+        PartInternal::get_name(&**self)
+    }
+
+    fn get_input_size(&self) -> usize {
+        PartInternal::get_input_size(&**self)
+    }
+
+    fn get_output_size(&self) -> usize {
+        PartInternal::get_output_size(&**self)
+    }
+
+    fn clone_internal(&self) -> Box<dyn PartInternal> {
+        PartInternal::clone_internal(&**self)
+    }
+
+    fn debug(&'static self) -> Box<dyn Debug> {
+        PartInternal::debug(&**self)
+    }
+}
+
 impl<T> PartInternal for T
 where
     T: Part + 'static,
@@ -102,6 +128,10 @@ impl Circuit {
             next_output_index: 0,
             name: None,
         }
+    }
+
+    fn set_name(&mut self, name: String) {
+        self.name = Some(name);
     }
 
     fn add_part(&mut self, part: impl PartInternal + 'static) -> PartInfo {
@@ -275,13 +305,10 @@ impl Translator {
         self.scope_defs.last_mut().expect("no scope to get")
     }
 
-    // Todo: make this behave differently, this is fine for if there is only a main function,
-    // otherwise a circuit should be returned because it needs to be instantiatable
-    fn translate_function_def(
-        &mut self,
-        node: FunctionDefinition,
-        circuit: &mut Circuit,
-    ) -> Option<usize> {
+    fn make_function_circuit(&mut self, node: FunctionDefinition) -> Circuit {
+        let mut circuit = Circuit::new();
+        circuit.set_name(node.get_name().to_string());
+
         // add the inputs of the function to the circuit
         for input in node.get_args() {
             let input_index = circuit.add_program_input();
@@ -291,29 +318,57 @@ impl Translator {
             self.get_current_scope().add_variable(name, input_index);
         }
 
-        let mut output_index = None;
-
         // translate the body of the function
         for sub_node in node.get_body() {
             match sub_node {
                 ASTNode::Return(_) => {
                     // get the circuit for the expression
                     let internal_output_index =
-                        self.translate_ast_internal(sub_node.clone(), circuit);
+                        self.translate_ast_internal(sub_node.clone(), &mut circuit);
 
                     // return statement means this is the output of the circuit
                     // connect the output of the internal circuit to the output of the main circuit
                     let new_output_index = circuit.add_program_output();
                     circuit.connect(internal_output_index, new_output_index);
-                    output_index = Some(new_output_index);
                 }
                 _ => {
-                    let _output_index = self.translate_ast_internal(sub_node.clone(), circuit);
+                    let _output_index = self.translate_ast_internal(sub_node.clone(), &mut circuit);
                 }
             }
         }
 
-        output_index
+        circuit
+    }
+
+    // Todo: make this behave differently, this is fine for if there is only a main function,
+    // otherwise a circuit should be returned because it needs to be instantiatable
+    fn translate_function_main(
+        &mut self,
+        node: FunctionDefinition,
+        circuit: &mut Circuit,
+    ) -> Option<usize> {
+        let function_circuit = self.make_function_circuit(node);
+        let info = circuit.add_part(function_circuit);
+        // add an output to the circuit
+        let output_index = circuit.add_program_output();
+        // connect the output of the function to the output of the circuit
+        circuit.connect(info.output_offset, output_index);
+        Some(output_index)
+    }
+
+    fn translate_function_def(
+        &mut self,
+        node: FunctionDefinition,
+        circuit: &mut Circuit,
+    ) -> Option<usize> {
+        if node.get_name() == "main" {
+            self.translate_function_main(node, circuit)
+        } else {
+            let function_name = node.get_name().to_string();
+            let function_circuit = self.make_function_circuit(node);
+            self.add_function_circuit(function_name, function_circuit);
+            None
+        }
     }
 
     fn translate_if_statement(&self, node: ASTNode, circuit: &mut Circuit) -> usize {
@@ -404,7 +459,6 @@ impl Translator {
                 // This will take a lot of thought. Some sort of structure where it can guarentee the function isn't being used twice at the same time
                 // And if it is instatiate a new version
                 //panic!("Function calls are not yet implemented.")
-                let mut output_index = None;
                 let mut arg_indices = vec![];
                 for arg in call.get_args() {
                     let arg_index = self.translate_ast_internal(arg.clone(), circuit);
@@ -415,15 +469,21 @@ impl Translator {
                 let function_name = call.get_name();
                 let function_circuit = self.get_function_circuit(function_name.to_string());
                 // add the function to the circuit
-                let function_info = circuit.add_part(function_circuit);
+                let function_info = circuit.add_part(function_circuit.clone());
 
-                output_index.expect("function call with no arguments")
+                // connect the inputs of the function to the outputs of the arguments
+                for (i, arg_index) in arg_indices.iter().enumerate() {
+                    circuit.connect(*arg_index, function_info.input_offset + i);
+                }
+
+                // connect the output of the function to the output of the circuit
+                function_info.output_offset
             }
             _ => panic!("{:#?} not yet implemented", expr),
         }
     }
 
-    fn get_operator_circuit(&self, operator: &Operator) -> Box<dyn Part> {
+    fn get_operator_circuit(&self, operator: &Operator) -> Box<dyn PartInternal> {
         match operator {
             Operator::Plus => Box::new(Adder {}),
             Operator::Minus => Box::new(Subtractor {}),

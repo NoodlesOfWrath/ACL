@@ -1,7 +1,7 @@
 use crate::translator::Part;
 // ! these are placeholders for now, they should be circuits of transistors or something
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Multiplier {}
 
 impl Part for Multiplier {
@@ -26,7 +26,7 @@ impl Part for Multiplier {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Adder {}
 
 impl Part for Adder {
@@ -51,7 +51,7 @@ impl Part for Adder {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Divider {}
 
 impl Part for Divider {
@@ -76,7 +76,7 @@ impl Part for Divider {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Subtractor {}
 
 impl Part for Subtractor {
