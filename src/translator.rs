@@ -340,29 +340,16 @@ impl Translator {
         circuit
     }
 
-    // Todo: make this behave differently, this is fine for if there is only a main function,
-    // otherwise a circuit should be returned because it needs to be instantiatable
-    fn translate_function_main(
-        &mut self,
-        node: FunctionDefinition,
-        circuit: &mut Circuit,
-    ) -> Option<usize> {
-        let function_circuit = self.make_function_circuit(node);
-        let info = circuit.add_part(function_circuit);
-        // add an output to the circuit
-        let output_index = circuit.add_program_output();
-        // connect the output of the function to the output of the circuit
-        circuit.connect(info.output_offset, output_index);
-        Some(output_index)
-    }
-
     fn translate_function_def(
         &mut self,
         node: FunctionDefinition,
         circuit: &mut Circuit,
     ) -> Option<usize> {
         if node.get_name() == "main" {
-            self.translate_function_main(node, circuit)
+            // set the circuit to the main circuit
+            let main_circuit = self.make_function_circuit(node);
+            *circuit = main_circuit;
+            Some((circuit as &dyn PartInternal).get_output_size() - 1)
         } else {
             let function_name = node.get_name().to_string();
             let function_circuit = self.make_function_circuit(node);
