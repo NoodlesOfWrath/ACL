@@ -27,7 +27,7 @@ trait PartInternal {
     fn get_input_size(&self) -> usize;
     fn get_output_size(&self) -> usize;
     fn clone_internal(&self) -> Box<dyn PartInternal>;
-    fn debug(&'static self) -> Box<dyn Debug>;
+    fn debug(&self) -> Box<dyn Debug>;
 }
 
 impl PartInternal for Box<dyn PartInternal> {
@@ -51,7 +51,7 @@ impl PartInternal for Box<dyn PartInternal> {
         PartInternal::clone_internal(&**self)
     }
 
-    fn debug(&'static self) -> Box<dyn Debug> {
+    fn debug(&self) -> Box<dyn Debug> {
         PartInternal::debug(&**self)
     }
 }
@@ -81,14 +81,14 @@ where
         part
     }
 
-    fn debug(&'static self) -> Box<dyn Debug> {
+    fn debug(&self) -> Box<dyn Debug> {
         Part::as_debug(self)
     }
 }
 
 impl Debug for dyn PartInternal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.get_name())
+        self.debug().fmt(f)
     }
 }
 
@@ -105,7 +105,9 @@ impl Part for Circuit {
     }
 
     fn get_name(&self) -> String {
-        self.name.clone().unwrap_or("Unnamed Circuit".to_string())
+        self.name
+            .clone()
+            .unwrap_or_else(|| "Unnamed Circuit".to_string())
     }
 
     fn get_input_size(&self) -> usize {
@@ -178,13 +180,16 @@ struct PartInfo {
     output_offset: usize, // the same as input_offset but for outputs
 }
 
-pub trait Part: Debug + Clone {
+pub trait Part: Debug + Clone
+where
+    Self: 'static,
+{
     fn test(&self, input: Vec<f64>) -> Vec<f64>;
     fn get_name(&self) -> String;
     fn get_input_size(&self) -> usize;
     fn get_output_size(&self) -> usize;
-    fn as_debug(&'static self) -> Box<dyn Debug> {
-        Box::new(self) as Box<dyn Debug>
+    fn as_debug(&self) -> Box<dyn Debug> {
+        Box::new(self.clone()) as Box<dyn Debug>
     }
 }
 
@@ -307,7 +312,6 @@ impl Translator {
 
     fn make_function_circuit(&mut self, node: FunctionDefinition) -> Circuit {
         let mut circuit = Circuit::new();
-        circuit.set_name(node.get_name().to_string());
 
         // add the inputs of the function to the circuit
         for input in node.get_args() {
@@ -337,6 +341,7 @@ impl Translator {
             }
         }
 
+        circuit.set_name(node.get_name().to_string());
         circuit
     }
 
@@ -353,6 +358,7 @@ impl Translator {
         } else {
             let function_name = node.get_name().to_string();
             let function_circuit = self.make_function_circuit(node);
+            println!("name: {:?}", Part::get_name(&function_circuit));
             self.add_function_circuit(function_name, function_circuit);
             None
         }
@@ -455,6 +461,9 @@ impl Translator {
                 // get the function definition
                 let function_name = call.get_name();
                 let function_circuit = self.get_function_circuit(function_name.to_string());
+                let mut function_circuit_clone = function_circuit.clone();
+                function_circuit_clone.set_name(function_name.to_string());
+
                 // add the function to the circuit
                 let function_info = circuit.add_part(function_circuit.clone());
 
