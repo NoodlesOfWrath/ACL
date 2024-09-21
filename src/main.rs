@@ -4,6 +4,7 @@ extern crate pest_derive;
 use pest::Parser;
 mod ast;
 use ast::*;
+mod spice_translator;
 mod sub_circuits;
 #[cfg(test)]
 mod tests;
