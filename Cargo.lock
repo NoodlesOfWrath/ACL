@@ -3,6 +3,15 @@
 version = 3
 
 [[package]]
+name = "ACL"
+version = "0.1.0"
+dependencies = [
+ "pest",
+ "pest_derive",
+ "test_each_file",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -126,15 +135,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "proper_vhdl_transpiler"
-version = "0.1.0"
-dependencies = [
- "pest",
- "pest_derive",
- "test_each_file",
 ]
 
 [[package]]

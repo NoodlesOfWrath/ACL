@@ -1,5 +1,5 @@
 [package]
-name = "proper_vhdl_transpiler"
+name = "ACL"
 version = "0.1.0"
 edition = "2021"
 
