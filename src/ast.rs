@@ -111,6 +111,16 @@ pub struct IfStatement {
     body: Vec<ASTNode>,
 }
 
+impl IfStatement {
+    pub fn get_condition(&self) -> &Expression {
+        &self.condition
+    }
+
+    pub fn get_body(&self) -> &Vec<ASTNode> {
+        &self.body
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Expression {
     Dyadic(Dyadic),

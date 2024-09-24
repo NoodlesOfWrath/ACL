@@ -4,7 +4,7 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 use crate::{
     sub_circuits::{Adder, Divider, Multiplier, Subtractor},
-    ASTNode, Expression, FunctionDefinition, Operator,
+    ASTNode, Expression, FunctionDefinition, IfStatement, Operator,
 };
 
 #[derive(Debug, Clone)]
@@ -364,8 +364,20 @@ impl Translator {
         }
     }
 
-    fn translate_if_statement(&self, node: ASTNode, circuit: &mut Circuit) -> usize {
-        // translate the body of the function
+    fn translate_if_statement(&mut self, node: IfStatement, circuit: &mut Circuit) {
+        // two parts: the condition and the body
+        let condition_circuit =
+            self.translate_ast_internal(ASTNode::Expression(node.get_condition().clone()), circuit);
+        let mut body_circuit = Circuit::new();
+        for sub_node in node.get_body() {
+            let _output_index = self.translate_ast_internal(sub_node.clone(), &mut body_circuit);
+        }
+        // this should form a circuit that looks like this:
+        // condition_circuit   -            - body_circuit -
+        //                       \        /                 \
+        //                         Gate -                    |
+        //                       /        \                  |
+        // if statement inputs -            ------------------ rest of the function
         unimplemented!()
     }
 
