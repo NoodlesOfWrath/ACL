@@ -364,6 +364,12 @@ impl Translator {
         }
     }
 
+    // We have to note that if statements are pointless without
+    // case 1:
+    // - let value = if(smth) {smth} else {smth}
+    // which i will ignore for now
+    // - a return statement in the if statement
+    // which is problematic because return statements are only parsed in the outermost body of a function right now
     fn translate_if_statement(&mut self, node: IfStatement, circuit: &mut Circuit) {
         // two parts: the condition and the body
         let condition_circuit =
@@ -372,12 +378,18 @@ impl Translator {
         for sub_node in node.get_body() {
             let _output_index = self.translate_ast_internal(sub_node.clone(), &mut body_circuit);
         }
-        // this should form a circuit that looks like this:
+        // this should form a circuit that looks like this for case 1 (which we aren't supporting for now):
         // condition_circuit   -            - body_circuit -
         //                       \        /                 \
         //                         Gate -                    |
         //                       /        \                  |
         // if statement inputs -            ------------------ rest of the function
+        // in case 2 the circuit would look like this
+        // condition_circuit   -            ----- body_circuit -----
+        //                       \        /                          \
+        //                         Gate -                              - Function Out
+        //                       /        \                          /
+        // if statement inputs -            - rest of the function -
         unimplemented!()
     }
 
