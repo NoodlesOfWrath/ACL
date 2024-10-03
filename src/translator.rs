@@ -1,6 +1,6 @@
 //! turns functions into circuits
 
-use std::{collections::HashMap, fmt::Debug, hash::Hash};
+use std::{collections::HashMap, fmt::Debug, hash::Hash, vec};
 
 use crate::{
     sub_circuits::{Adder, Divider, Multiplier, Subtractor},
@@ -262,6 +262,33 @@ impl ScopeInfo {
     }
 }
 
+struct ScopeBody {
+    body: Vec<ASTNode>,
+}
+
+impl ScopeBody {
+    fn new(vec: Vec<ASTNode>) -> Self {
+        ScopeBody { body: vec }
+    }
+
+    fn get_body(&self) -> &Vec<ASTNode> {
+        &self.body
+    }
+
+    fn get_circuit(&self) -> Circuit {
+        let mut circuit = Circuit::new();
+        for node in &self.body {
+            todo!()
+        }
+        circuit
+    }
+}
+
+#[derive(Debug, Clone)]
+enum NoVariableError {
+    NotDefinedInScope,
+}
+
 pub struct Translator {
     scope_defs: Vec<ScopeInfo>,
     function_defs: HashMap<String, Circuit>,
@@ -288,10 +315,13 @@ impl Translator {
     }
 
     /// get the index of a variable in the current scope
-    pub fn get_variable_index(&mut self, ident: String) -> usize {
+    pub fn get_variable_index(&mut self, ident: String) -> Result<usize, NoVariableError> {
         let scope = self.scope_defs.last().unwrap();
-        let var_info = scope.variables.get(&ident).unwrap();
-        var_info.index
+        let var_info = scope
+            .variables
+            .get(&ident)
+            .ok_or(NoVariableError::NotDefinedInScope)?;
+        Ok(var_info.index)
     }
 
     /// we copy the last scope whenever we enter a new scope
@@ -340,7 +370,10 @@ impl Translator {
                     // return statement means this is the output of the circuit
                     // connect the output of the internal circuit to the output of the main circuit
                     let new_output_index = circuit.add_program_output();
-                    circuit.connect(internal_output_index, new_output_index);
+                    circuit.connect(
+                        internal_output_index.expect("failed to get internal output index"),
+                        new_output_index,
+                    );
                 }
                 _ => {
                     let _output_index = self.translate_ast_internal(sub_node.clone(), circuit);
@@ -478,15 +511,28 @@ impl Translator {
                 let operator_info = circuit.add_part(operator_circuit);
 
                 // connect the inputs of the operator to the outputs of the left and right circuits
-                circuit.connect(left_circuit_output_index, operator_info.input_offset);
-                circuit.connect(right_circuit_output_index, operator_info.input_offset + 1);
+                circuit.connect(
+                    left_circuit_output_index.expect("failed to get internal output index"),
+                    operator_info.input_offset,
+                );
+                circuit.connect(
+                    right_circuit_output_index.expect("failed to get internal output index"),
+                    operator_info.input_offset + 1,
+                );
 
                 operator_info.output_offset // assuming the operator has only one output
             }
             Expression::Identifier(ident) => {
-                let var_index = self.get_variable_index(ident);
-                // output the index of the variable
-                var_index
+                let var_index = self.get_variable_index(ident.clone());
+                // if the variable is not in the current scope, it must be a function argument
+                // so we add a new input to the circuit
+                if let Err(_) = var_index {
+                    let input_index = circuit.add_program_input();
+                    self.get_current_scope().add_variable(ident, input_index);
+                    input_index
+                } else {
+                    var_index.unwrap()
+                }
             }
             Expression::FunctionCall(call) => {
                 // This will take a lot of thought. Some sort of structure where it can guarentee the function isn't being used twice at the same time
@@ -509,7 +555,10 @@ impl Translator {
 
                 // connect the inputs of the function to the outputs of the arguments
                 for (i, arg_index) in arg_indices.iter().enumerate() {
-                    circuit.connect(*arg_index, function_info.input_offset + i);
+                    circuit.connect(
+                        arg_index.expect("failed to get arg index"),
+                        function_info.input_offset + i,
+                    );
                 }
 
                 // connect the output of the function to the output of the circuit
