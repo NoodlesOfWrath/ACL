@@ -323,12 +323,19 @@ impl Translator {
         }
 
         // translate the body of the function
+        self.process_function_returns(node.clone(), &mut circuit);
+
+        circuit.set_name(node.get_name().to_string());
+        circuit
+    }
+
+    fn process_function_returns(&mut self, node: FunctionDefinition, circuit: &mut Circuit) {
         for sub_node in node.get_body() {
             match sub_node {
                 ASTNode::Return(_) => {
                     // get the circuit for the expression
                     let internal_output_index =
-                        self.translate_ast_internal(sub_node.clone(), &mut circuit);
+                        self.translate_ast_internal(sub_node.clone(), circuit);
 
                     // return statement means this is the output of the circuit
                     // connect the output of the internal circuit to the output of the main circuit
@@ -336,13 +343,10 @@ impl Translator {
                     circuit.connect(internal_output_index, new_output_index);
                 }
                 _ => {
-                    let _output_index = self.translate_ast_internal(sub_node.clone(), &mut circuit);
+                    let _output_index = self.translate_ast_internal(sub_node.clone(), circuit);
                 }
             }
         }
-
-        circuit.set_name(node.get_name().to_string());
-        circuit
     }
 
     fn translate_function_def(
@@ -370,6 +374,18 @@ impl Translator {
     // which i will ignore for now
     // - a return statement in the if statement
     // which is problematic because return statements are only parsed in the outermost body of a function right now
+    // this should form a circuit that looks like this for case 1 (which we aren't supporting for now):
+    // condition_circuit   -            - body_circuit -
+    //                       \        /                 \
+    //                         Gate -                    |
+    //                       /        \                  |
+    // if statement inputs -            ------------------ rest of the function
+    // in case 2 the circuit would look like this
+    // condition_circuit   -             ----- body_circuit -----
+    //                       \         /                          \
+    //                         - Gate -                              - Function Out
+    //                       /         \                          /
+    // if statement inputs -             - rest of the function -
     fn translate_if_statement(&mut self, node: IfStatement, circuit: &mut Circuit) {
         // two parts: the condition and the body
         let condition_circuit =
@@ -377,24 +393,19 @@ impl Translator {
         let mut body_circuit = Circuit::new();
         for sub_node in node.get_body() {
             let _output_index = self.translate_ast_internal(sub_node.clone(), &mut body_circuit);
+            // now we need a function that can look at a section of code and give us a wire that represents the output of that section
+            // a "return finder" if you will
         }
-        // this should form a circuit that looks like this for case 1 (which we aren't supporting for now):
-        // condition_circuit   -            - body_circuit -
-        //                       \        /                 \
-        //                         Gate -                    |
-        //                       /        \                  |
-        // if statement inputs -            ------------------ rest of the function
-        // in case 2 the circuit would look like this
-        // condition_circuit   -            ----- body_circuit -----
-        //                       \        /                          \
-        //                         Gate -                              - Function Out
-        //                       /        \                          /
-        // if statement inputs -            - rest of the function -
+
         unimplemented!()
     }
 
     /// Outputs the index of the output of the circuit
-    pub fn translate_ast_internal(&mut self, node: ASTNode, circuit: &mut Circuit) -> usize {
+    pub fn translate_ast_internal(
+        &mut self,
+        node: ASTNode,
+        circuit: &mut Circuit,
+    ) -> Option<usize> {
         match node {
             ASTNode::Program(nodes) => {
                 let mut output_index = None;
@@ -419,26 +430,31 @@ impl Translator {
                     panic!("main function not defined or doesn't return anything");
                 }
 
-                output_index.unwrap()
+                output_index
             }
             ASTNode::FunctionDefinition(func_def) => {
                 self.enter_scope();
                 let output_index = self.translate_function_def(func_def, circuit);
                 self.exit_scope();
-                output_index.expect("don't yet support functions without return statements")
-            }
-            ASTNode::IfStatement(_) => {
-                self.enter_scope();
-                let output_index = self.translate_if_statement(node, circuit);
-                self.exit_scope();
                 output_index
             }
-            ASTNode::Return(inner_expr) => {
-                let sub_circuit = self.translate_ast(*inner_expr);
-                let info = circuit.add_part(sub_circuit);
-                info.output_offset
+            ASTNode::IfStatement(statement) => {
+                self.enter_scope();
+                self.translate_if_statement(statement, circuit);
+                self.exit_scope();
+                None
             }
-            ASTNode::Expression(expr) => self.translate_expression(expr, circuit),
+            ASTNode::Return(ref inner_expr) => {
+                // get the circuit for the expression
+                let internal_output_index = self.translate_ast_internal(node.clone(), circuit);
+
+                // return statement means this is the output of the circuit
+                // connect the output of the internal circuit to the output of the main circuit
+                let new_output_index = circuit.add_program_output();
+                circuit.connect(internal_output_index?, new_output_index);
+                Some(new_output_index)
+            }
+            ASTNode::Expression(expr) => Some(self.translate_expression(expr, circuit)),
 
             _ => panic!("{:?} couldn't be handled", node),
         }
