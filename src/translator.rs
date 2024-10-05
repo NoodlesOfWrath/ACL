@@ -479,7 +479,8 @@ impl Translator {
             }
             ASTNode::Return(ref inner_expr) => {
                 // get the circuit for the expression
-                let internal_output_index = self.translate_ast_internal(node.clone(), circuit);
+                let internal_output_index =
+                    self.translate_ast_internal(*inner_expr.clone(), circuit);
 
                 // return statement means this is the output of the circuit
                 // connect the output of the internal circuit to the output of the main circuit
