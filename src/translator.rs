@@ -8,10 +8,16 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
+struct CircuitInput {
+    index: usize,
+    name: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Circuit {
     parts: Vec<Box<dyn PartInternal>>,
     connections: Vec<(usize, usize)>,
-    program_inputs: Vec<usize>,
+    program_inputs: Vec<CircuitInput>,
     program_outputs: Vec<usize>,
     // I don't really like the idea of having to keep track of the next input/output index
     // but I can't think of a better way to do it other than summing the input/output sizes of all the parts every single time
@@ -159,9 +165,9 @@ impl Circuit {
     }
 
     // add an input to the circuit
-    fn add_program_input(&mut self) -> usize {
+    fn add_program_input(&mut self, name: Option<String>) -> usize {
         let index = self.next_input_index;
-        self.program_inputs.push(index);
+        self.program_inputs.push(CircuitInput { index, name });
         self.next_input_index += 1;
         index
     }
@@ -275,17 +281,25 @@ impl ScopeBody {
         &self.body
     }
 
-    fn get_circuit(&self) -> Circuit {
+    /// returns a circuit that represents the body of the scope
+    /// if variables are used in the body that are not defined in the scope,
+    fn get_circuit(&self, exterior_translator: Translator) -> Circuit {
         let mut circuit = Circuit::new();
+
+        // we don't want the variables from the exterior scope to be used in the body (the indices wouldn't exist or would be wrong)
+        let mut translator = Translator::new();
+        translator.function_defs = exterior_translator.function_defs.clone();
+
         for node in &self.body {
-            todo!()
+            let _output_index = translator.translate_ast_internal(node.clone(), &mut circuit);
         }
+
         circuit
     }
 }
 
 #[derive(Debug, Clone)]
-enum NoVariableError {
+pub enum NoVariableError {
     NotDefinedInScope,
 }
 
@@ -340,12 +354,13 @@ impl Translator {
         self.scope_defs.last_mut().expect("no scope to get")
     }
 
+    // TODO: make this use the ScopeBody struct
     fn make_function_circuit(&mut self, node: FunctionDefinition) -> Circuit {
         let mut circuit = Circuit::new();
 
         // add the inputs of the function to the circuit
         for input in node.get_args() {
-            let input_index = circuit.add_program_input();
+            let input_index = circuit.add_program_input(Some(input.0.clone()));
             let name = input.0.clone();
 
             // the type isn't used for now
@@ -528,7 +543,7 @@ impl Translator {
                 // if the variable is not in the current scope, it must be a function argument
                 // so we add a new input to the circuit
                 if let Err(_) = var_index {
-                    let input_index = circuit.add_program_input();
+                    let input_index = circuit.add_program_input(Some(ident.clone()));
                     self.get_current_scope().add_variable(ident, input_index);
                     input_index
                 } else {
