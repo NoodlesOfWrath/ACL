@@ -283,12 +283,12 @@ impl ScopeBody {
 
     /// returns a circuit that represents the body of the scope
     /// if variables are used in the body that are not defined in the scope,
-    fn get_circuit(&self, exterior_translator: Translator) -> Circuit {
+    fn get_circuit(&self, exterior_function_defs: HashMap<String, Circuit>) -> Circuit {
         let mut circuit = Circuit::new();
 
         // we don't want the variables from the exterior scope to be used in the body (the indices wouldn't exist or would be wrong)
         let mut translator = Translator::new();
-        translator.function_defs = exterior_translator.function_defs.clone();
+        translator.function_defs = exterior_function_defs.clone();
 
         for node in &self.body {
             let _output_index = translator.translate_ast_internal(node.clone(), &mut circuit);
@@ -438,14 +438,12 @@ impl Translator {
         // two parts: the condition and the body
         let condition_circuit =
             self.translate_ast_internal(ASTNode::Expression(node.get_condition().clone()), circuit);
-        let mut body_circuit = Circuit::new();
-        for sub_node in node.get_body() {
-            let _output_index = self.translate_ast_internal(sub_node.clone(), &mut body_circuit);
-            // now we need a function that can look at a section of code and give us a wire that represents the output of that section
-            // a "return finder" if you will
-        }
-
-        unimplemented!()
+        let body_circuit = ScopeBody::new(node.get_body().clone());
+        body_circuit.get_circuit(self.function_defs.clone());
+        // connect the condition to the body
+        // TODO: connect the condition properly
+        // also, we need to make sure the body's inputs are connected properly
+        // and also are routed properly based on the condition
     }
 
     /// Outputs the index of the output of the circuit
