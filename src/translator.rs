@@ -28,7 +28,6 @@ pub struct Circuit {
 
 // an object safe version of Part
 trait PartInternal {
-    fn test(&self, input: Vec<f64>) -> Vec<f64>;
     fn get_name(&self) -> String;
     fn get_input_size(&self) -> usize;
     fn get_output_size(&self) -> usize;
@@ -37,10 +36,6 @@ trait PartInternal {
 }
 
 impl PartInternal for Box<dyn PartInternal> {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        PartInternal::test(&**self, input)
-    }
-
     fn get_name(&self) -> String {
         PartInternal::get_name(&**self)
     }
@@ -66,10 +61,6 @@ impl<T> PartInternal for T
 where
     T: Part + 'static,
 {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        Part::test(self, input)
-    }
-
     fn get_name(&self) -> String {
         Part::get_name(self)
     }
@@ -105,11 +96,6 @@ impl Clone for Box<dyn PartInternal> {
 }
 
 impl Part for Circuit {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        // for now just return the input
-        input
-    }
-
     fn get_name(&self) -> String {
         self.name
             .clone()
@@ -190,7 +176,6 @@ pub trait Part: Debug + Clone
 where
     Self: 'static,
 {
-    fn test(&self, input: Vec<f64>) -> Vec<f64>;
     fn get_name(&self) -> String;
     fn get_input_size(&self) -> usize;
     fn get_output_size(&self) -> usize;
@@ -205,10 +190,6 @@ struct Constant {
 }
 
 impl Part for Constant {
-    fn test(&self, _input: Vec<f64>) -> Vec<f64> {
-        vec![self.value]
-    }
-
     fn get_name(&self) -> String {
         "Constant".to_string()
     }
@@ -228,11 +209,6 @@ struct Resistor {
 }
 
 impl Part for Resistor {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        // im pretty sure this is just wrong...
-        vec![input[0] / self.resistance]
-    }
-
     fn get_name(&self) -> String {
         "Resistor".to_string()
     }

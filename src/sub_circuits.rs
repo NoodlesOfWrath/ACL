@@ -5,14 +5,6 @@ use crate::translator::Part;
 pub struct Multiplier {}
 
 impl Part for Multiplier {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        let mut output = vec![];
-        for i in 0..input.len() {
-            output.push(input[i] * input[i + 1]);
-        }
-        output
-    }
-
     fn get_name(&self) -> String {
         "Multiplier".to_string()
     }
@@ -30,14 +22,6 @@ impl Part for Multiplier {
 pub struct Adder {}
 
 impl Part for Adder {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        let mut output = vec![];
-        for i in 0..input.len() {
-            output.push(input[i] + input[i + 1]);
-        }
-        output
-    }
-
     fn get_name(&self) -> String {
         "Adder".to_string()
     }
@@ -55,14 +39,6 @@ impl Part for Adder {
 pub struct Divider {}
 
 impl Part for Divider {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        let mut output = vec![];
-        for i in 0..input.len() {
-            output.push(input[i] / input[i + 1]);
-        }
-        output
-    }
-
     fn get_name(&self) -> String {
         "Divider".to_string()
     }
@@ -80,14 +56,6 @@ impl Part for Divider {
 pub struct Subtractor {}
 
 impl Part for Subtractor {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        let mut output = vec![];
-        for i in 0..input.len() {
-            output.push(input[i] - input[i + 1]);
-        }
-        output
-    }
-
     fn get_name(&self) -> String {
         "Subtractor".to_string()
     }
@@ -106,10 +74,6 @@ impl Part for Subtractor {
 pub struct Comparator {}
 
 impl Part for Comparator {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        vec![]
-    }
-
     fn get_name(&self) -> String {
         "Comparator".to_string()
     }
@@ -128,10 +92,6 @@ impl Part for Comparator {
 pub struct And {}
 
 impl Part for And {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        vec![]
-    }
-
     fn get_name(&self) -> String {
         "And".to_string()
     }
@@ -152,14 +112,6 @@ impl Part for And {
 pub struct IfGate {}
 
 impl Part for IfGate {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        if input[0].round() == 0.0 {
-            vec![input[1], 0.0]
-        } else {
-            vec![0.0, input[1]]
-        }
-    }
-
     fn get_name(&self) -> String {
         "IfGate".to_string()
     }
