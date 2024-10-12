@@ -422,6 +422,32 @@ impl Translator {
         // and also are routed properly based on the condition
     }
 
+    fn translate_program(&mut self, nodes: Vec<ASTNode>, circuit: &mut Circuit) -> usize {
+        let mut output_index = None;
+        for node in nodes {
+            match node {
+                ASTNode::FunctionDefinition(func_def) => {
+                    if func_def.get_name() == "main" {
+                        if output_index.is_some() {
+                            panic!("main function already defined");
+                        }
+
+                        output_index = self.translate_function_def(func_def, circuit);
+                    } else {
+                        self.translate_function_def(func_def, circuit);
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        if output_index.is_none() {
+            panic!("main function not defined or doesn't return anything");
+        }
+
+        output_index.unwrap()
+    }
+
     /// Outputs the index of the output of the circuit
     pub fn translate_ast_internal(
         &mut self,
@@ -429,31 +455,7 @@ impl Translator {
         circuit: &mut Circuit,
     ) -> Option<usize> {
         match node {
-            ASTNode::Program(nodes) => {
-                let mut output_index = None;
-                for node in nodes {
-                    match node {
-                        ASTNode::FunctionDefinition(func_def) => {
-                            if func_def.get_name() == "main" {
-                                if output_index.is_some() {
-                                    panic!("main function already defined");
-                                }
-
-                                output_index = self.translate_function_def(func_def, circuit);
-                            } else {
-                                self.translate_function_def(func_def, circuit);
-                            }
-                        }
-                        _ => (),
-                    }
-                }
-
-                if output_index.is_none() {
-                    panic!("main function not defined or doesn't return anything");
-                }
-
-                output_index
-            }
+            ASTNode::Program(nodes) => Some(self.translate_program(nodes, circuit)),
             ASTNode::FunctionDefinition(func_def) => {
                 self.enter_scope();
                 let output_index = self.translate_function_def(func_def, circuit);
