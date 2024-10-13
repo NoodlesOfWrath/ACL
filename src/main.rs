@@ -14,7 +14,7 @@ mod translator;
 #[grammar = "ACL.pest"] // Specifies the grammar file
 struct HLHDLParser;
 
-const FILE: &str = "test_scripts/function_tester.acl";
+const FILE: &str = "test_scripts/adder_with_assignment.acl";
 
 fn main() {
     let unparsed_file = std::fs::read_to_string(FILE).expect("cannot read file");

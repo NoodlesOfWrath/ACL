@@ -1,6 +1,6 @@
 //! turns functions into circuits
 
-use std::{collections::HashMap, fmt::Debug, hash::Hash};
+use std::{collections::HashMap, fmt::Debug, hash::Hash, vec};
 
 use crate::{
     sub_circuits::{Adder, Divider, Multiplier, Subtractor},
@@ -8,10 +8,16 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
+struct CircuitInput {
+    index: usize,
+    name: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Circuit {
     parts: Vec<Box<dyn PartInternal>>,
     connections: Vec<(usize, usize)>,
-    program_inputs: Vec<usize>,
+    program_inputs: Vec<CircuitInput>,
     program_outputs: Vec<usize>,
     // I don't really like the idea of having to keep track of the next input/output index
     // but I can't think of a better way to do it other than summing the input/output sizes of all the parts every single time
@@ -22,7 +28,6 @@ pub struct Circuit {
 
 // an object safe version of Part
 trait PartInternal {
-    fn test(&self, input: Vec<f64>) -> Vec<f64>;
     fn get_name(&self) -> String;
     fn get_input_size(&self) -> usize;
     fn get_output_size(&self) -> usize;
@@ -31,10 +36,6 @@ trait PartInternal {
 }
 
 impl PartInternal for Box<dyn PartInternal> {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        PartInternal::test(&**self, input)
-    }
-
     fn get_name(&self) -> String {
         PartInternal::get_name(&**self)
     }
@@ -60,10 +61,6 @@ impl<T> PartInternal for T
 where
     T: Part + 'static,
 {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        Part::test(self, input)
-    }
-
     fn get_name(&self) -> String {
         Part::get_name(self)
     }
@@ -99,11 +96,6 @@ impl Clone for Box<dyn PartInternal> {
 }
 
 impl Part for Circuit {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        // for now just return the input
-        input
-    }
-
     fn get_name(&self) -> String {
         self.name
             .clone()
@@ -159,9 +151,9 @@ impl Circuit {
     }
 
     // add an input to the circuit
-    fn add_program_input(&mut self) -> usize {
+    fn add_program_input(&mut self, name: Option<String>) -> usize {
         let index = self.next_input_index;
-        self.program_inputs.push(index);
+        self.program_inputs.push(CircuitInput { index, name });
         self.next_input_index += 1;
         index
     }
@@ -184,7 +176,6 @@ pub trait Part: Debug + Clone
 where
     Self: 'static,
 {
-    fn test(&self, input: Vec<f64>) -> Vec<f64>;
     fn get_name(&self) -> String;
     fn get_input_size(&self) -> usize;
     fn get_output_size(&self) -> usize;
@@ -199,10 +190,6 @@ struct Constant {
 }
 
 impl Part for Constant {
-    fn test(&self, _input: Vec<f64>) -> Vec<f64> {
-        vec![self.value]
-    }
-
     fn get_name(&self) -> String {
         "Constant".to_string()
     }
@@ -222,11 +209,6 @@ struct Resistor {
 }
 
 impl Part for Resistor {
-    fn test(&self, input: Vec<f64>) -> Vec<f64> {
-        // im pretty sure this is just wrong...
-        vec![input[0] / self.resistance]
-    }
-
     fn get_name(&self) -> String {
         "Resistor".to_string()
     }
@@ -262,6 +244,41 @@ impl ScopeInfo {
     }
 }
 
+struct ScopeBody {
+    body: Vec<ASTNode>,
+}
+
+impl ScopeBody {
+    fn new(vec: Vec<ASTNode>) -> Self {
+        ScopeBody { body: vec }
+    }
+
+    fn get_body(&self) -> &Vec<ASTNode> {
+        &self.body
+    }
+
+    /// returns a circuit that represents the body of the scope
+    /// if variables are used in the body that are not defined in the scope,
+    fn get_circuit(&self, exterior_function_defs: HashMap<String, Circuit>) -> Circuit {
+        let mut circuit = Circuit::new();
+
+        // we don't want the variables from the exterior scope to be used in the body (the indices wouldn't exist or would be wrong)
+        let mut translator = Translator::new();
+        translator.function_defs = exterior_function_defs.clone();
+
+        for node in &self.body {
+            let _output_index = translator.translate_ast_internal(node.clone(), &mut circuit);
+        }
+
+        circuit
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum NoVariableError {
+    NotDefinedInScope,
+}
+
 pub struct Translator {
     scope_defs: Vec<ScopeInfo>,
     function_defs: HashMap<String, Circuit>,
@@ -288,10 +305,13 @@ impl Translator {
     }
 
     /// get the index of a variable in the current scope
-    pub fn get_variable_index(&mut self, ident: String) -> usize {
+    pub fn get_variable_index(&mut self, ident: String) -> Result<usize, NoVariableError> {
         let scope = self.scope_defs.last().unwrap();
-        let var_info = scope.variables.get(&ident).unwrap();
-        var_info.index
+        let var_info = scope
+            .variables
+            .get(&ident)
+            .ok_or(NoVariableError::NotDefinedInScope)?;
+        Ok(var_info.index)
     }
 
     /// we copy the last scope whenever we enter a new scope
@@ -310,12 +330,13 @@ impl Translator {
         self.scope_defs.last_mut().expect("no scope to get")
     }
 
+    // TODO: make this use the ScopeBody struct
     fn make_function_circuit(&mut self, node: FunctionDefinition) -> Circuit {
         let mut circuit = Circuit::new();
 
         // add the inputs of the function to the circuit
         for input in node.get_args() {
-            let input_index = circuit.add_program_input();
+            let input_index = circuit.add_program_input(Some(input.0.clone()));
             let name = input.0.clone();
 
             // the type isn't used for now
@@ -323,26 +344,33 @@ impl Translator {
         }
 
         // translate the body of the function
+        self.process_function_returns(node.clone(), &mut circuit);
+
+        circuit.set_name(node.get_name().to_string());
+        circuit
+    }
+
+    fn process_function_returns(&mut self, node: FunctionDefinition, circuit: &mut Circuit) {
         for sub_node in node.get_body() {
             match sub_node {
                 ASTNode::Return(_) => {
                     // get the circuit for the expression
                     let internal_output_index =
-                        self.translate_ast_internal(sub_node.clone(), &mut circuit);
+                        self.translate_ast_internal(sub_node.clone(), circuit);
 
                     // return statement means this is the output of the circuit
                     // connect the output of the internal circuit to the output of the main circuit
                     let new_output_index = circuit.add_program_output();
-                    circuit.connect(internal_output_index, new_output_index);
+                    circuit.connect(
+                        internal_output_index.expect("failed to get internal output index"),
+                        new_output_index,
+                    );
                 }
                 _ => {
-                    let _output_index = self.translate_ast_internal(sub_node.clone(), &mut circuit);
+                    let _output_index = self.translate_ast_internal(sub_node.clone(), circuit);
                 }
             }
         }
-
-        circuit.set_name(node.get_name().to_string());
-        circuit
     }
 
     fn translate_function_def(
@@ -370,75 +398,88 @@ impl Translator {
     // which i will ignore for now
     // - a return statement in the if statement
     // which is problematic because return statements are only parsed in the outermost body of a function right now
+    // this should form a circuit that looks like this for case 1 (which we aren't supporting for now):
+    // condition_circuit   -            - body_circuit -
+    //                       \        /                 \
+    //                         Gate -                    |
+    //                       /        \                  |
+    // if statement inputs -            ------------------ rest of the function
+    // in case 2 the circuit would look like this
+    // condition_circuit   -             ----- body_circuit -----
+    //                       \         /                          \
+    //                         - Gate -                              - Function Out
+    //                       /         \                          /
+    // if statement inputs -             - rest of the function -
     fn translate_if_statement(&mut self, node: IfStatement, circuit: &mut Circuit) {
         // two parts: the condition and the body
         let condition_circuit =
             self.translate_ast_internal(ASTNode::Expression(node.get_condition().clone()), circuit);
-        let mut body_circuit = Circuit::new();
-        for sub_node in node.get_body() {
-            let _output_index = self.translate_ast_internal(sub_node.clone(), &mut body_circuit);
+        let body_circuit = ScopeBody::new(node.get_body().clone());
+        body_circuit.get_circuit(self.function_defs.clone());
+        // connect the condition to the body
+        // TODO: connect the condition properly
+        // also, we need to make sure the body's inputs are connected properly
+        // and also are routed properly based on the condition
+    }
+
+    fn translate_program(&mut self, nodes: Vec<ASTNode>, circuit: &mut Circuit) -> usize {
+        let mut output_index = None;
+        for node in nodes {
+            match node {
+                ASTNode::FunctionDefinition(func_def) => {
+                    if func_def.get_name() == "main" {
+                        if output_index.is_some() {
+                            panic!("main function already defined");
+                        }
+
+                        output_index = self.translate_function_def(func_def, circuit);
+                    } else {
+                        self.translate_function_def(func_def, circuit);
+                    }
+                }
+                _ => (),
+            }
         }
-        // this should form a circuit that looks like this for case 1 (which we aren't supporting for now):
-        // condition_circuit   -            - body_circuit -
-        //                       \        /                 \
-        //                         Gate -                    |
-        //                       /        \                  |
-        // if statement inputs -            ------------------ rest of the function
-        // in case 2 the circuit would look like this
-        // condition_circuit   -            ----- body_circuit -----
-        //                       \        /                          \
-        //                         Gate -                              - Function Out
-        //                       /        \                          /
-        // if statement inputs -            - rest of the function -
-        unimplemented!()
+
+        if output_index.is_none() {
+            panic!("main function not defined or doesn't return anything");
+        }
+
+        output_index.unwrap()
     }
 
     /// Outputs the index of the output of the circuit
-    pub fn translate_ast_internal(&mut self, node: ASTNode, circuit: &mut Circuit) -> usize {
+    pub fn translate_ast_internal(
+        &mut self,
+        node: ASTNode,
+        circuit: &mut Circuit,
+    ) -> Option<usize> {
         match node {
-            ASTNode::Program(nodes) => {
-                let mut output_index = None;
-                for node in nodes {
-                    match node {
-                        ASTNode::FunctionDefinition(func_def) => {
-                            if func_def.get_name() == "main" {
-                                if output_index.is_some() {
-                                    panic!("main function already defined");
-                                }
-
-                                output_index = self.translate_function_def(func_def, circuit);
-                            } else {
-                                self.translate_function_def(func_def, circuit);
-                            }
-                        }
-                        _ => (),
-                    }
-                }
-
-                if output_index.is_none() {
-                    panic!("main function not defined or doesn't return anything");
-                }
-
-                output_index.unwrap()
-            }
+            ASTNode::Program(nodes) => Some(self.translate_program(nodes, circuit)),
             ASTNode::FunctionDefinition(func_def) => {
                 self.enter_scope();
                 let output_index = self.translate_function_def(func_def, circuit);
                 self.exit_scope();
-                output_index.expect("don't yet support functions without return statements")
-            }
-            ASTNode::IfStatement(_) => {
-                self.enter_scope();
-                let output_index = self.translate_if_statement(node, circuit);
-                self.exit_scope();
                 output_index
             }
-            ASTNode::Return(inner_expr) => {
-                let sub_circuit = self.translate_ast(*inner_expr);
-                let info = circuit.add_part(sub_circuit);
-                info.output_offset
+            ASTNode::IfStatement(statement) => {
+                self.enter_scope();
+                self.translate_if_statement(statement, circuit);
+                self.exit_scope();
+                None
             }
-            ASTNode::Expression(expr) => self.translate_expression(expr, circuit),
+            ASTNode::Return(ref inner_expr) => {
+                // get the circuit for the expression
+                let internal_output_index =
+                    self.translate_ast_internal(*inner_expr.clone(), circuit);
+
+                // return statement means this is the output of the circuit
+                // connect the output of the internal circuit to the output of the main circuit
+                let new_output_index = circuit.add_program_output();
+                circuit.connect(internal_output_index?, new_output_index);
+                Some(new_output_index)
+            }
+            ASTNode::Expression(expr) => Some(self.translate_expression(expr, circuit)),
 
             _ => panic!("{:?} couldn't be handled", node),
         }
@@ -462,15 +503,28 @@ impl Translator {
                 let operator_info = circuit.add_part(operator_circuit);
 
                 // connect the inputs of the operator to the outputs of the left and right circuits
-                circuit.connect(left_circuit_output_index, operator_info.input_offset);
-                circuit.connect(right_circuit_output_index, operator_info.input_offset + 1);
+                circuit.connect(
+                    left_circuit_output_index.expect("failed to get internal output index"),
+                    operator_info.input_offset,
+                );
+                circuit.connect(
+                    right_circuit_output_index.expect("failed to get internal output index"),
+                    operator_info.input_offset + 1,
+                );
 
                 operator_info.output_offset // assuming the operator has only one output
             }
             Expression::Identifier(ident) => {
-                let var_index = self.get_variable_index(ident);
-                // output the index of the variable
-                var_index
+                let var_index = self.get_variable_index(ident.clone());
+                // if the variable is not in the current scope, it must be a function argument
+                // so we add a new input to the circuit
+                if let Err(_) = var_index {
+                    let input_index = circuit.add_program_input(Some(ident.clone()));
+                    self.get_current_scope().add_variable(ident, input_index);
+                    input_index
+                } else {
+                    var_index.unwrap()
+                }
             }
             Expression::FunctionCall(call) => {
                 // This will take a lot of thought. Some sort of structure where it can guarentee the function isn't being used twice at the same time
@@ -493,7 +547,10 @@ impl Translator {
 
                 // connect the inputs of the function to the outputs of the arguments
                 for (i, arg_index) in arg_indices.iter().enumerate() {
-                    circuit.connect(*arg_index, function_info.input_offset + i);
+                    circuit.connect(
+                        arg_index.expect("failed to get arg index"),
+                        function_info.input_offset + i,
+                    );
                 }
 
                 // connect the output of the function to the output of the circuit

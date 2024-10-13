@@ -6,3 +6,4 @@ struct SpiceTranslator {
     circuit: Circuit,
     spice: String,
 }
+

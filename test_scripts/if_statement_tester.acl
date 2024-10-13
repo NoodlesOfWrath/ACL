@@ -1,5 +1,7 @@
 fn main(number_1: Int, number_2: Int) -> Int {
     if number_1 > number_2 {
+        // anything inside here should be a subcircuit
+        // subcircuit input: number_1, number_2
         return number_1 - number_2;
     } else {
         return number_1 + number_2;
