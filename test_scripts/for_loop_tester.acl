@@ -1,0 +1,5 @@
+fn main(number_1: Int, number_2: Int) -> Int {
+    for i in 0..10 {
+        number_1 = number_1 + i;
+    }
+}
