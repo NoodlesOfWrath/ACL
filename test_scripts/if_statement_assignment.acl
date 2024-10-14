@@ -1,0 +1,11 @@
+fn main(number_1: Int, number_2: Int) -> Int {
+    let num = if number_1 > number_2 {
+        // anything inside here should be a subcircuit
+        // subcircuit input: number_1, number_2
+        number_1 - number_2
+    } else {
+        number_1 + number_2
+    }
+
+    return num;
+}
